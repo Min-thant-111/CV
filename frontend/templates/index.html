@@ -1,15 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Edge-CV Traffic Intelligence — IoT-Enabled Real-Time Traffic Density Estimation and Intelligent Signaling Dashboard" />
+  <meta name="description"
+    content="Edge-CV Traffic Intelligence — IoT-Enabled Real-Time Traffic Density Estimation and Intelligent Signaling Dashboard" />
   <title>Edge-CV Traffic Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/styles.css" />
 </head>
+
 <body>
 
   <!-- ── HEADER ───────────────────────────────────────────── -->
@@ -78,10 +83,14 @@
 
         <!-- Video Metadata -->
         <div id="meta-grid" class="meta-grid hidden">
-          <div class="meta-item"><span class="meta-label">Resolution</span><span id="meta-res" class="meta-value">—</span></div>
-          <div class="meta-item"><span class="meta-label">FPS</span><span id="meta-fps" class="meta-value">—</span></div>
-          <div class="meta-item"><span class="meta-label">Duration</span><span id="meta-dur" class="meta-value">—</span></div>
-          <div class="meta-item"><span class="meta-label">Total Frames</span><span id="meta-frames" class="meta-value">—</span></div>
+          <div class="meta-item"><span class="meta-label">Resolution</span><span id="meta-res"
+              class="meta-value">—</span></div>
+          <div class="meta-item"><span class="meta-label">FPS</span><span id="meta-fps" class="meta-value">—</span>
+          </div>
+          <div class="meta-item"><span class="meta-label">Duration</span><span id="meta-dur" class="meta-value">—</span>
+          </div>
+          <div class="meta-item"><span class="meta-label">Total Frames</span><span id="meta-frames"
+              class="meta-value">—</span></div>
         </div>
       </div>
 
@@ -98,9 +107,9 @@
         </div>
         <div class="signal-body">
           <div class="traffic-light-housing">
-            <div class="tl-lamp tl-red"    id="lamp-red"></div>
+            <div class="tl-lamp tl-red" id="lamp-red"></div>
             <div class="tl-lamp tl-yellow" id="lamp-yellow"></div>
-            <div class="tl-lamp tl-green"  id="lamp-green"></div>
+            <div class="tl-lamp tl-green" id="lamp-green"></div>
           </div>
           <div class="signal-info">
             <div class="signal-state-label" id="signal-state">—</div>
@@ -119,8 +128,10 @@
         <div class="density-body">
           <div class="gauge-wrap">
             <svg class="gauge-svg" viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
-              <path class="gauge-bg"    d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="14" stroke-linecap="round"/>
-              <path class="gauge-fill" id="gauge-arc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="14" stroke-linecap="round" stroke-dasharray="0 251"/>
+              <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="14"
+                stroke-linecap="round" />
+              <path class="gauge-fill" id="gauge-arc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="14"
+                stroke-linecap="round" stroke-dasharray="0 251" />
             </svg>
             <div class="gauge-center">
               <div id="density-pct" class="gauge-pct">0%</div>
@@ -142,25 +153,33 @@
             <span class="veh-icon">🚗</span>
             <span class="veh-label">Car</span>
             <span class="veh-count" id="count-car">—</span>
-            <div class="veh-bar-bg"><div class="veh-bar" id="bar-car" style="width:0%"></div></div>
+            <div class="veh-bar-bg">
+              <div class="veh-bar" id="bar-car" style="width:0%"></div>
+            </div>
           </div>
           <div class="breakdown-item">
             <span class="veh-icon">🏍️</span>
             <span class="veh-label">Motorcycle</span>
             <span class="veh-count" id="count-motorcycle">—</span>
-            <div class="veh-bar-bg"><div class="veh-bar veh-bar-moto" id="bar-motorcycle" style="width:0%"></div></div>
+            <div class="veh-bar-bg">
+              <div class="veh-bar veh-bar-moto" id="bar-motorcycle" style="width:0%"></div>
+            </div>
           </div>
           <div class="breakdown-item">
             <span class="veh-icon">🚌</span>
             <span class="veh-label">Bus</span>
             <span class="veh-count" id="count-bus">—</span>
-            <div class="veh-bar-bg"><div class="veh-bar veh-bar-bus" id="bar-bus" style="width:0%"></div></div>
+            <div class="veh-bar-bg">
+              <div class="veh-bar veh-bar-bus" id="bar-bus" style="width:0%"></div>
+            </div>
           </div>
           <div class="breakdown-item">
             <span class="veh-icon">🚛</span>
             <span class="veh-label">Truck</span>
             <span class="veh-count" id="count-truck">—</span>
-            <div class="veh-bar-bg"><div class="veh-bar veh-bar-truck" id="bar-truck" style="width:0%"></div></div>
+            <div class="veh-bar-bg">
+              <div class="veh-bar veh-bar-truck" id="bar-truck" style="width:0%"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -172,10 +191,9 @@
   <!-- ── FOOTER ────────────────────────────────────────────── -->
   <footer class="footer">
     <span>An IoT-Enabled Edge-CV Framework for Real-Time Traffic Density Estimation and Intelligent Signaling</span>
-    <span class="footer-sep">·</span>
-    <span>Final Year Project · 2024</span>
   </footer>
 
   <script src="/static/js/app.js"></script>
 </body>
+
 </html>
