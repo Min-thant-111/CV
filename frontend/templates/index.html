@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Edge-CV Traffic Intelligence — IoT-Enabled Real-Time Traffic Density Estimation and Intelligent Signaling Dashboard" />
+  <title>Edge-CV Traffic Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+
+  <!-- ── HEADER ───────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="brand-icon">🚦</div>
+      <div>
+        <div class="brand-title">Edge-CV Traffic Intelligence</div>
+        <div class="brand-subtitle">IoT-Enabled Real-Time Density Estimation &amp; Intelligent Signaling</div>
+      </div>
+    </div>
+    <div class="header-meta">
+      <span id="header-status-badge" class="badge badge-idle">IDLE</span>
+    </div>
+  </header>
+
+  <main class="main-grid">
+
+    <!-- ── LEFT COLUMN ──────────────────────────────────────── -->
+    <section class="left-col">
+
+      <!-- Upload Card -->
+      <div class="card" id="upload-card">
+        <div class="card-header">
+          <span class="card-icon">📤</span>
+          <h2 class="card-title">Upload Traffic Video</h2>
+        </div>
+
+        <div id="drop-zone" class="drop-zone" role="button" tabindex="0" aria-label="Upload video file">
+          <div class="drop-zone-inner">
+            <div class="drop-icon">☁️</div>
+            <p class="drop-primary">Drag &amp; drop or click to upload</p>
+            <p class="drop-secondary">Supported: MP4, AVI, MOV, MKV, WEBM · Max 500 MB</p>
+          </div>
+          <input type="file" id="file-input" accept=".mp4,.avi,.mov,.mkv,.webm" hidden />
+        </div>
+
+        <div id="file-info" class="file-info hidden">
+          <span class="file-icon">🎬</span>
+          <div class="file-details">
+            <div id="file-name" class="file-name">—</div>
+            <div id="file-size" class="file-size">—</div>
+          </div>
+        </div>
+
+        <button id="analyse-btn" class="btn btn-primary" disabled>
+          <span id="btn-label">Analyse Video</span>
+          <span id="btn-spinner" class="spinner hidden"></span>
+        </button>
+      </div>
+
+      <!-- Status Card -->
+      <div class="card" id="status-card">
+        <div class="card-header">
+          <span class="card-icon">⚙️</span>
+          <h2 class="card-title">Processing Status</h2>
+        </div>
+        <div id="status-message" class="status-message">Awaiting video upload.</div>
+        <div class="progress-bar-wrap">
+          <div id="progress-bar" class="progress-bar" style="width:0%"></div>
+        </div>
+        <div class="progress-labels">
+          <span id="progress-label">0%</span>
+          <span id="frame-label">—</span>
+        </div>
+
+        <!-- Video Metadata -->
+        <div id="meta-grid" class="meta-grid hidden">
+          <div class="meta-item"><span class="meta-label">Resolution</span><span id="meta-res" class="meta-value">—</span></div>
+          <div class="meta-item"><span class="meta-label">FPS</span><span id="meta-fps" class="meta-value">—</span></div>
+          <div class="meta-item"><span class="meta-label">Duration</span><span id="meta-dur" class="meta-value">—</span></div>
+          <div class="meta-item"><span class="meta-label">Total Frames</span><span id="meta-frames" class="meta-value">—</span></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── RIGHT COLUMN ─────────────────────────────────────── -->
+    <section class="right-col">
+
+      <!-- Traffic Light & Signal -->
+      <div class="card signal-card">
+        <div class="card-header">
+          <span class="card-icon">🚦</span>
+          <h2 class="card-title">Signal Decision</h2>
+        </div>
+        <div class="signal-body">
+          <div class="traffic-light-housing">
+            <div class="tl-lamp tl-red"    id="lamp-red"></div>
+            <div class="tl-lamp tl-yellow" id="lamp-yellow"></div>
+            <div class="tl-lamp tl-green"  id="lamp-green"></div>
+          </div>
+          <div class="signal-info">
+            <div class="signal-state-label" id="signal-state">—</div>
+            <div class="signal-duration" id="signal-duration">— s</div>
+            <div class="signal-reason" id="signal-reason">No signal yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Density Gauge -->
+      <div class="card density-card">
+        <div class="card-header">
+          <span class="card-icon">📊</span>
+          <h2 class="card-title">Traffic Density</h2>
+        </div>
+        <div class="density-body">
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
+              <path class="gauge-bg"    d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="14" stroke-linecap="round"/>
+              <path class="gauge-fill" id="gauge-arc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="14" stroke-linecap="round" stroke-dasharray="0 251"/>
+            </svg>
+            <div class="gauge-center">
+              <div id="density-pct" class="gauge-pct">0%</div>
+              <div id="density-level-badge" class="density-level-badge">—</div>
+            </div>
+          </div>
+          <div id="density-vehicles" class="density-total">Total vehicles: <strong id="vehicle-count">—</strong></div>
+        </div>
+      </div>
+
+      <!-- Vehicle Breakdown -->
+      <div class="card breakdown-card">
+        <div class="card-header">
+          <span class="card-icon">🚗</span>
+          <h2 class="card-title">Vehicle Breakdown</h2>
+        </div>
+        <div class="breakdown-grid">
+          <div class="breakdown-item">
+            <span class="veh-icon">🚗</span>
+            <span class="veh-label">Car</span>
+            <span class="veh-count" id="count-car">—</span>
+            <div class="veh-bar-bg"><div class="veh-bar" id="bar-car" style="width:0%"></div></div>
+          </div>
+          <div class="breakdown-item">
+            <span class="veh-icon">🏍️</span>
+            <span class="veh-label">Motorcycle</span>
+            <span class="veh-count" id="count-motorcycle">—</span>
+            <div class="veh-bar-bg"><div class="veh-bar veh-bar-moto" id="bar-motorcycle" style="width:0%"></div></div>
+          </div>
+          <div class="breakdown-item">
+            <span class="veh-icon">🚌</span>
+            <span class="veh-label">Bus</span>
+            <span class="veh-count" id="count-bus">—</span>
+            <div class="veh-bar-bg"><div class="veh-bar veh-bar-bus" id="bar-bus" style="width:0%"></div></div>
+          </div>
+          <div class="breakdown-item">
+            <span class="veh-icon">🚛</span>
+            <span class="veh-label">Truck</span>
+            <span class="veh-count" id="count-truck">—</span>
+            <div class="veh-bar-bg"><div class="veh-bar veh-bar-truck" id="bar-truck" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ── FOOTER ────────────────────────────────────────────── -->
+  <footer class="footer">
+    <span>An IoT-Enabled Edge-CV Framework for Real-Time Traffic Density Estimation and Intelligent Signaling</span>
+    <span class="footer-sep">·</span>
+    <span>Final Year Project · 2024</span>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
