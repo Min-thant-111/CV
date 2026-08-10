@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+venv/
+.venv/
+ENV/
+
+# Project Directories & Data Files (exclude binary/heavy assets, preserve folder structure)
+videos/*.mp4
+videos/*.avi
+videos/*.mkv
+!videos/.gitkeep
+outputs/*
+!outputs/.gitkeep
+models/*.pt
+models/*.onnx
+models/*.engine
+!models/.gitkeep
+
+# Environment variables & secrets
+.env
+.env.local
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log

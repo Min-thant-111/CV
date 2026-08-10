@@ -1,0 +1,12 @@
+# Core Edge-CV & Numerical Processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+ultralytics>=8.0.0
+supervision>=0.16.0
+
+# IoT & Communications
+paho-mqtt>=1.6.1
+
+# Environment & Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0

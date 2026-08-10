@@ -1,0 +1,135 @@
+"""
+Traffic Density Estimation Engine.
+
+Calculates video-based traffic density metrics from tracked vehicle objects
+using a Passenger Car Unit (PCU) weighted capacity model and configurable
+classification thresholds (LOW, MEDIUM, HIGH).
+
+Note:
+This module provides a computer vision-based traffic density estimation derived
+from tracked vehicle visual features in the camera field of view (or ROI zone),
+rather than a physical inductive loop sensor measurement.
+"""
+
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
+import cv2
+import numpy as np
+
+from backend.models.tracking import FrameTracks, TrackedObject
+from backend.models.density import DensityMetrics
+
+
+DEFAULT_VEHICLE_WEIGHTS: Dict[str, float] = {
+    "motorcycle": 0.5,
+    "car": 1.0,
+    "bus": 2.5,
+    "truck": 3.0,
+}
+
+
+@dataclass
+class DensityConfig:
+    """Configurable parameters for traffic density estimation."""
+
+    vehicle_weights: Dict[str, float] = field(
+        default_factory=lambda: dict(DEFAULT_VEHICLE_WEIGHTS)
+    )
+    max_road_capacity_units: float = 10.0  # PCU capacity of road segment/view
+    low_threshold_pct: float = 35.0        # < 35% is LOW density
+    high_threshold_pct: float = 70.0       # >= 70% is HIGH density (35%-70% is MEDIUM)
+    roi_polygon: Optional[List[Tuple[float, float]]] = None  # Polygon coordinates for ROI filtering
+
+
+class DensityEngineError(Exception):
+    """Base exception for DensityEngine errors."""
+
+    pass
+
+
+class DensityEngine:
+    """Deterministic Traffic Density Estimation Engine."""
+
+    def __init__(self, config: Optional[DensityConfig] = None):
+        """Args:
+
+        config: DensityConfig instance holding custom weights and thresholds.
+        """
+        self.config = config or DensityConfig()
+
+    def set_roi_polygon(self, polygon: Optional[List[Tuple[float, float]]]) -> None:
+        """Configure optional Region of Interest (ROI) polygon."""
+        self.config.roi_polygon = polygon
+
+    def _is_inside_roi(self, bbox: Tuple[float, float, float, float]) -> bool:
+        """Check if vehicle bounding box center falls within configured ROI polygon."""
+        if not self.config.roi_polygon or len(self.config.roi_polygon) < 3:
+            return True  # If no ROI defined, count all objects in frame
+
+        x1, y1, x2, y2 = bbox
+        center_x = (x1 + x2) / 2.0
+        center_y = (y1 + y2) / 2.0
+
+        pts = np.array(self.config.roi_polygon, dtype=np.int32)
+        res = cv2.pointPolygonTest(pts, (float(center_x), float(center_y)), False)
+        return res >= 0
+
+    def compute_density(self, frame_tracks: FrameTracks) -> DensityMetrics:
+        """Compute traffic density metrics for a single frame track set.
+
+        Args:
+            frame_tracks: FrameTracks object containing active vehicle tracks.
+
+        Returns:
+            DensityMetrics object containing counts, weighted PCU units, density percentage, and level.
+        """
+        if frame_tracks is None:
+            raise ValueError("Invalid FrameTracks provided to DensityEngine.")
+
+        filtered_tracks: List[TrackedObject] = []
+        for track in frame_tracks.tracks:
+            if self._is_inside_roi(track.bbox):
+                filtered_tracks.append(track)
+
+        # 1. Total unique active vehicle count
+        total_count = len(filtered_tracks)
+
+        # 2. Count breakdown by vehicle class
+        class_counts: Dict[str, int] = {}
+        weighted_units = 0.0
+        active_track_ids: List[int] = []
+
+        for track in filtered_tracks:
+            cls = track.class_name
+            class_counts[cls] = class_counts.get(cls, 0) + 1
+
+            # Get vehicle weight (default to 1.0 if unspecified)
+            weight = self.config.vehicle_weights.get(cls, 1.0)
+            weighted_units += weight
+
+            active_track_ids.append(track.track_id)
+
+        # 3. Calculate density percentage relative to max road capacity
+        capacity = max(0.1, self.config.max_road_capacity_units)
+        density_pct = (weighted_units / capacity) * 100.0
+        density_pct = min(100.0, round(density_pct, 2))
+
+        # 4. Classify density level (LOW, MEDIUM, HIGH)
+        if density_pct < self.config.low_threshold_pct:
+            density_level = "LOW"
+        elif density_pct < self.config.high_threshold_pct:
+            density_level = "MEDIUM"
+        else:
+            density_level = "HIGH"
+
+        return DensityMetrics(
+            frame_index=frame_tracks.frame_index,
+            timestamp=frame_tracks.timestamp,
+            total_vehicle_count=total_count,
+            class_counts=class_counts,
+            weighted_vehicle_units=round(weighted_units, 2),
+            capacity_units=capacity,
+            density_percentage=density_pct,
+            density_level=density_level,
+            active_track_ids=active_track_ids,
+        )
