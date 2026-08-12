@@ -39,6 +39,7 @@ class VehicleTracker:
         class_history_frames: int = 12,
         heavy_vehicle_min_confidence: float = 0.30,
         heavy_vehicle_min_observations: int = 3,
+        bus_min_observations: int = 2,
         class_switch_margin: float = 1.20,
         suppress_camera_overlay: bool = True,
         overlay_top_fraction: float = 0.24,
@@ -85,6 +86,7 @@ class VehicleTracker:
         self.heavy_vehicle_min_observations = max(
             1, int(heavy_vehicle_min_observations)
         )
+        self.bus_min_observations = max(1, int(bus_min_observations))
         self.class_switch_margin = max(1.0, float(class_switch_margin))
         self.suppress_camera_overlay = bool(suppress_camera_overlay)
         self.overlay_top_fraction = min(
@@ -546,19 +548,24 @@ class VehicleTracker:
 
                 candidate = max(scores, key=scores.get)
                 confirmed_heavy = False
-                required = self.heavy_vehicle_min_observations
-                recent = list(history)[-required:]
-                if (
-                    len(recent) == required
-                    and recent[0][0] in heavy_ids
-                    and all(
-                        class_id == recent[0][0]
-                        and confidence >= self.heavy_vehicle_min_confidence
-                        for class_id, confidence in recent
+                for heavy_id in heavy_ids:
+                    required = (
+                        self.bus_min_observations
+                        if self.target_classes.get(heavy_id) == "bus"
+                        else self.heavy_vehicle_min_observations
                     )
-                ):
-                    candidate = recent[0][0]
-                    confirmed_heavy = True
+                    recent = list(history)[-required:]
+                    if (
+                        len(recent) == required
+                        and all(
+                            class_id == heavy_id
+                            and confidence >= self.heavy_vehicle_min_confidence
+                            for class_id, confidence in recent
+                        )
+                    ):
+                        candidate = heavy_id
+                        confirmed_heavy = True
+                        break
 
                 if track_id in geometry_heavy_ids and item.class_id in heavy_ids:
                     candidate = item.class_id

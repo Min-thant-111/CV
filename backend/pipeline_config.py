@@ -20,7 +20,7 @@ class PipelineConfig:
     target_height: Optional[int] = None
 
     # ── YOLO / Tracker ─────────────────────────────────────
-    model_path: str = "yolov8n.pt"
+    model_path: str = "yolov8s.pt"
     confidence_threshold: float = 0.20
     inference_size: int = 640
     iou_threshold: float = 0.45
@@ -36,6 +36,7 @@ class PipelineConfig:
     class_history_frames: int = 12
     heavy_vehicle_min_confidence: float = 0.30
     heavy_vehicle_min_observations: int = 3
+    bus_min_observations: int = 2
     class_switch_margin: float = 1.20
     suppress_camera_overlay: bool = True
     overlay_top_fraction: float = 0.24

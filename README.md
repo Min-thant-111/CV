@@ -142,7 +142,7 @@ A modular, edge-deployable computer-vision and IoT framework that:
 
 - Python 3.10+
 - [Mosquitto MQTT Broker](https://mosquitto.org/download/) *(optional — MQTT gracefully skips if unavailable)*
-- A YOLOv8 model weight file (`yolov8n.pt` is auto-downloaded by Ultralytics on first run)
+- A YOLOv8 model weight file (`yolov8s.pt` is used by default for stronger vehicle subtype accuracy)
 
 ### 2. Clone and Setup
 
@@ -177,7 +177,7 @@ Key `.env` variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `YOLO_MODEL_PATH` | `yolov8n.pt` | Path to YOLO weights |
+| `YOLO_MODEL_PATH` | `yolov8s.pt` | Path to YOLO weights (`yolov8n.pt` is faster but less accurate) |
 | `CONFIDENCE_THRESHOLD` | `0.35` | Detection confidence threshold |
 | `MQTT_BROKER_HOST` | `localhost` | MQTT broker address |
 | `MQTT_BROKER_PORT` | `1883` | MQTT broker port |

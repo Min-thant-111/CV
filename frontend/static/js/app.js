@@ -27,9 +27,6 @@
   const outputPreview   = document.getElementById('output-preview');
   const outputEmpty     = document.getElementById('output-empty');
   const outputCaption   = document.getElementById('output-caption');
-  const uploadLibrary   = document.getElementById('upload-library');
-  const outputLibrary   = document.getElementById('output-library');
-  const refreshLibrary  = document.getElementById('refresh-library');
 
   // Metadata
   const metaGrid    = document.getElementById('meta-grid');
@@ -51,6 +48,9 @@
   const densityPct    = document.getElementById('density-pct');
   const densityBadge  = document.getElementById('density-level-badge');
   const vehicleCount  = document.getElementById('vehicle-count');
+  const detectedPeakCount = document.getElementById('detected-peak-count');
+  const averageVehicleCount = document.getElementById('average-vehicle-count');
+  const activeVehicleCount = document.getElementById('active-vehicle-count');
   const densityPathCount = document.getElementById('density-path-count');
 
   // Vehicle breakdown
@@ -230,7 +230,6 @@
     } else {
       clearVideo('output', 'Analysis completed, but no processed video URL was returned.');
     }
-    await loadVideoLibrary();
   }
 
   function failAnalysis(message) {
@@ -278,7 +277,13 @@
         }
         setStatus(
           `Processing frame ${data.frame_index} | ` +
-          `Peak ${data.vehicle_count} vehicle${data.vehicle_count !== 1 ? 's' : ''}` +
+          `Estimated ${data.vehicle_count} vehicle${data.vehicle_count !== 1 ? 's' : ''}` +
+          (data.detected_peak_vehicle_count !== undefined
+            ? ` | ${data.detected_peak_vehicle_count} detected peak`
+            : '') +
+          (data.average_vehicle_count !== undefined
+            ? ` | ${data.average_vehicle_count} average`
+            : '') +
           (data.active_vehicle_count !== undefined
             ? ` | ${data.active_vehicle_count} active now`
             : '') +
@@ -300,6 +305,9 @@
 
     densityPct.textContent = `${pct}%`;
     vehicleCount.textContent = data.vehicle_count ?? '—';
+    detectedPeakCount.textContent = data.detected_peak_vehicle_count ?? '—';
+    averageVehicleCount.textContent = data.average_vehicle_count ?? '—';
+    activeVehicleCount.textContent = data.active_vehicle_count ?? '—';
 
     // Gauge arc: dasharray = (pct/100) * GAUGE_TOTAL
     const filled = Math.round((pct / 100) * GAUGE_TOTAL);
@@ -356,7 +364,7 @@
     });
   }
 
-  /* Video playback and library */
+  /* Video playback */
   function stopOutputPreview(hide = false) {
     previewJobId = null;
     if (previewPollTimer !== null) window.clearInterval(previewPollTimer);
@@ -474,52 +482,6 @@
     empty.classList.remove('hidden');
   }
 
-  function renderVideoList(container, items, kind) {
-    container.replaceChildren();
-    if (!items.length) {
-      const empty = document.createElement('div');
-      empty.className = 'video-list-empty';
-      empty.textContent = 'No videos found.';
-      container.appendChild(empty);
-      return;
-    }
-    items.forEach((item) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'video-list-item';
-      const name = document.createElement('span');
-      name.className = 'video-item-name';
-      name.textContent = item.path;
-      const size = document.createElement('span');
-      size.className = 'video-item-size';
-      size.textContent = formatBytes(item.size);
-      button.append(name, size);
-      button.addEventListener('click', () => showPlayableVideo(kind, item.url, item.path));
-      container.appendChild(button);
-    });
-  }
-
-  async function loadVideoLibrary() {
-    try {
-      const response = await fetch('/api/videos', { cache: 'no-store' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      renderVideoList(uploadLibrary, data.uploads || [], 'source');
-      renderVideoList(outputLibrary, data.outputs || [], 'output');
-      if (!sourceVideo.getAttribute('src') && data.uploads && data.uploads.length) {
-        showPlayableVideo('source', data.uploads[0].url, data.uploads[0].path);
-      }
-      if (!outputVideo.getAttribute('src') && data.outputs && data.outputs.length) {
-        showPlayableVideo('output', data.outputs[0].url, data.outputs[0].path);
-      }
-    } catch (_) {
-      uploadLibrary.textContent = 'Could not load the video library.';
-      outputLibrary.textContent = 'Could not load the video library.';
-    }
-  }
-
-  refreshLibrary.addEventListener('click', loadVideoLibrary);
-
   /* ── Helpers ─────────────────────────────────────── */
   function setStatus(msg, state) {
     statusMessage.textContent = msg;
@@ -561,6 +523,9 @@
     densityBadge.textContent = '—';
     densityBadge.className   = 'density-level-badge';
     vehicleCount.textContent = '—';
+    detectedPeakCount.textContent = '—';
+    averageVehicleCount.textContent = '—';
+    activeVehicleCount.textContent = '—';
     densityPathCount.textContent = '—';
     gaugeArc.setAttribute('stroke-dasharray', `0 ${GAUGE_TOTAL}`);
     CLASSES.forEach((cls) => {
@@ -584,6 +549,5 @@
     return minutes ? `${minutes}m ${remainder}s` : `${remainder}s`;
   }
 
-  loadVideoLibrary();
 
 })();

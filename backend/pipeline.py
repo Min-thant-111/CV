@@ -99,6 +99,7 @@ class TrafficPipeline:
             class_history_frames=self.config.class_history_frames,
             heavy_vehicle_min_confidence=self.config.heavy_vehicle_min_confidence,
             heavy_vehicle_min_observations=self.config.heavy_vehicle_min_observations,
+            bus_min_observations=self.config.bus_min_observations,
             class_switch_margin=self.config.class_switch_margin,
             suppress_camera_overlay=self.config.suppress_camera_overlay,
             overlay_top_fraction=self.config.overlay_top_fraction,

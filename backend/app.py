@@ -90,7 +90,7 @@ def _get_shared_detector():
             from backend.detection.yolo_detector import YOLODetector
 
             _shared_detector = YOLODetector(
-                model_path=os.getenv("YOLO_MODEL_PATH", "yolov8n.pt"),
+                model_path=os.getenv("YOLO_MODEL_PATH", "yolov8s.pt"),
                 confidence_threshold=float(
                     os.getenv("CONFIDENCE_THRESHOLD", "0.20")
                 ),
@@ -510,6 +510,7 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
             heavy_vehicle_min_observations=int(
                 os.getenv("HEAVY_VEHICLE_MIN_OBSERVATIONS", "3")
             ),
+            bus_min_observations=int(os.getenv("BUS_MIN_OBSERVATIONS", "2")),
             class_switch_margin=float(os.getenv("CLASS_SWITCH_MARGIN", "1.20")),
             suppress_camera_overlay=os.getenv(
                 "SUPPRESS_CAMERA_OVERLAY", "true"
@@ -639,7 +640,9 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
                 cv2.rectangle(
                     frame, (x1, y1), (x2, y2), (0, 220, 192), box_thickness
                 )
-                label = f"{track.class_name} #{track.track_id} {track.confidence:.2f}"
+                # Tracking IDs and confidence values are internal diagnostics.
+                # Keep the evaluated video readable for end users.
+                label = track.class_name.title()
                 cv2.putText(
                     frame, label, (x1, max(20, y1 - 7)),
                     cv2.FONT_HERSHEY_SIMPLEX, box_font_scale,

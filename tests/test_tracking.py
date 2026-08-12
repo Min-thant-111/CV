@@ -206,6 +206,39 @@ class TestVehicleTracker(unittest.TestCase):
         self.assertEqual(third.tracks[0].class_name, "truck")
 
     @patch("ultralytics.YOLO")
+    def test_far_field_zoom_adds_distant_vehicle_in_frame_coordinates(self, mock_yolo_cls):
+        mock_model = MagicMock()
+        mock_yolo_cls.return_value = mock_model
+
+        tracked_result = MagicMock()
+        tracked_result.boxes = []
+        mock_model.track.return_value = [tracked_result]
+
+        ordinary_tiles = [MagicMock(boxes=[]) for _ in range(4)]
+        distant_box = MagicMock()
+        distant_box.cls = [MagicMock(item=lambda: 2)]
+        distant_box.conf = [MagicMock(item=lambda: 0.14)]
+        distant_box.xyxy = [MagicMock(tolist=lambda: [10.0, 5.0, 20.0, 15.0])]
+        far_results = [MagicMock(boxes=[]), MagicMock(boxes=[distant_box]), MagicMock(boxes=[])]
+        mock_model.predict.side_effect = [ordinary_tiles, far_results]
+
+        detector = YOLODetector(model_path="yolov8n.pt")
+        tracker = VehicleTracker(
+            detector=detector,
+            high_recall=True,
+            far_field_recall=True,
+        )
+        tracks = tracker.track_frame(np.zeros((100, 200, 3), dtype=np.uint8))
+
+        self.assertEqual(tracker._far_field_bounds(200, 100), [
+            (0, 10, 96, 64), (60, 10, 132, 75), (90, 6, 200, 46),
+        ])
+        self.assertEqual(tracks.count, 1)
+        self.assertEqual(tracks.tracks[0].bbox, (70.0, 15.0, 80.0, 25.0))
+        self.assertEqual(mock_model.predict.call_args_list[1].kwargs["imgsz"], 1280)
+        self.assertEqual(mock_model.predict.call_args_list[1].kwargs["conf"], 0.05)
+
+    @patch("ultralytics.YOLO")
     def test_single_zoomed_tile_truck_never_relabels_tracked_car(self, mock_yolo_cls):
         mock_yolo_cls.return_value = MagicMock()
         detector = YOLODetector(model_path="yolov8n.pt")
@@ -264,6 +297,26 @@ class TestVehicleTracker(unittest.TestCase):
         self.assertEqual(second[0].class_name, "car")
         self.assertEqual(third[0].class_name, "car")
         self.assertEqual(fourth[0].class_name, "truck")
+
+    @patch("ultralytics.YOLO")
+    def test_two_confirmed_bus_frames_correct_an_initial_car_label(self, mock_yolo_cls):
+        mock_yolo_cls.return_value = MagicMock()
+        detector = YOLODetector(model_path="yolov8n.pt")
+        tracker = VehicleTracker(detector=detector, bus_min_observations=2)
+
+        first = tracker._stabilize_classes(
+            [TrackedObject(23, 2, "car", 0.80, (0, 0, 50, 50))], {23}, 0
+        )
+        second = tracker._stabilize_classes(
+            [TrackedObject(23, 5, "bus", 0.65, (0, 0, 50, 50))], {23}, 1
+        )
+        third = tracker._stabilize_classes(
+            [TrackedObject(23, 5, "bus", 0.68, (0, 0, 50, 50))], {23}, 2
+        )
+
+        self.assertEqual(first[0].class_name, "car")
+        self.assertEqual(second[0].class_name, "car")
+        self.assertEqual(third[0].class_name, "bus")
 
     @patch("ultralytics.YOLO")
     def test_near_tie_car_truck_duplicate_prefers_car(self, mock_yolo_cls):

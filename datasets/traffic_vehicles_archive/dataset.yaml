@@ -1,0 +1,11 @@
+# Ultralytics YOLO traffic-vehicle dataset
+path: C:/Users/L1/Documents/antigravity/An IoT-Enabled Edge-CV Framework for Real-Time Traffic Density Estimation and Intelligent Signaling/datasets/traffic_vehicles_archive
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: car
+  1: motorcycle
+  2: bus
+  3: truck

@@ -6,6 +6,7 @@ import unittest
 from backend.models.tracking import TrackedObject, FrameTracks
 from backend.models.density import DensityMetrics
 from backend.density.density_engine import DensityEngine, DensityConfig
+from backend.density.vehicle_count_estimator import estimate_visible_vehicles
 
 
 class TestDensityEngine(unittest.TestCase):
@@ -37,6 +38,71 @@ class TestDensityEngine(unittest.TestCase):
         self.assertEqual(m_dict["density_level"], "LOW")
         self.assertEqual(m_dict["density_percentage"], 15.0)
         self.assertEqual(m_dict["weighted_vehicle_units"], 1.5)
+
+    def test_low_resolution_five_path_queue_is_calibrated(self):
+        estimate = estimate_visible_vehicles(
+            detected_count=27,
+            class_counts={"car": 26, "bus": 1},
+            frame_width=320,
+            frame_height=240,
+            road_path_count=5,
+        )
+
+        self.assertEqual(estimate.detected_count, 27)
+        self.assertEqual(estimate.estimated_count, 65)
+        self.assertEqual(estimate.correction_factor, 2.4)
+        self.assertEqual(sum(estimate.class_counts.values()), 65)
+        self.assertEqual(estimate.class_counts, {"car": 63, "bus": 2})
+
+    def test_sparse_low_resolution_scene_gets_modest_recall_correction(self):
+        estimate = estimate_visible_vehicles(
+            detected_count=18,
+            class_counts={"car": 18},
+            frame_width=320,
+            frame_height=240,
+            road_path_count=5,
+        )
+
+        self.assertEqual(estimate.estimated_count, 22)
+        self.assertEqual(estimate.correction_factor, 1.2)
+
+    def test_full_resolution_sparse_scene_is_not_inflated(self):
+        estimate = estimate_visible_vehicles(
+            detected_count=22,
+            class_counts={"car": 22},
+            frame_width=640,
+            frame_height=480,
+            road_path_count=5,
+        )
+
+        self.assertEqual(estimate.estimated_count, 22)
+        self.assertEqual(estimate.correction_factor, 1.0)
+
+    def test_trained_heavy_level_enables_occlusion_correction(self):
+        estimate = estimate_visible_vehicles(
+            detected_count=20,
+            class_counts={"car": 20},
+            frame_width=320,
+            frame_height=240,
+            road_path_count=5,
+            traffic_level="heavy",
+        )
+
+        self.assertEqual(estimate.estimated_count, 52)
+        self.assertEqual(estimate.correction_factor, 2.6)
+
+    def test_trained_light_level_prevents_count_based_overcorrection(self):
+        estimate = estimate_visible_vehicles(
+            detected_count=30,
+            class_counts={"car": 30},
+            frame_width=320,
+            frame_height=240,
+            road_path_count=5,
+            traffic_level="light",
+        )
+
+        self.assertEqual(estimate.estimated_count, 36)
+        self.assertEqual(estimate.correction_factor, 1.2)
 
     def test_low_density_case(self):
         """Test LOW traffic density case (1 Car + 1 Motorcycle = 1.5 PCU -> 15%)."""
