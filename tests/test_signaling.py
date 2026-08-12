@@ -42,34 +42,34 @@ class TestSignalDecisionEngine(unittest.TestCase):
         self.assertEqual(d_dict["density_percentage"], 85.0)
 
     def test_low_density_decision(self):
-        """Test that LOW density returns 30s GREEN timing."""
+        """Test that LOW density starts at 30s and adds demand timing."""
         decision = self.engine.evaluate(
             input_data="LOW", vehicle_count=2, density_percentage=15.0
         )
         self.assertEqual(decision.signal, "GREEN")
-        self.assertEqual(decision.duration, 30)
+        self.assertEqual(decision.duration, 34)
         self.assertEqual(decision.density_level, "LOW")
-        self.assertIn("30s", decision.reason)
+        self.assertIn("34s", decision.reason)
 
     def test_medium_density_decision(self):
-        """Test that MEDIUM density returns 50s GREEN timing."""
+        """Test that MEDIUM density starts at 50s and adds demand timing."""
         decision = self.engine.evaluate(
             input_data="MEDIUM", vehicle_count=4, density_percentage=55.0
         )
         self.assertEqual(decision.signal, "GREEN")
-        self.assertEqual(decision.duration, 50)
+        self.assertEqual(decision.duration, 58)
         self.assertEqual(decision.density_level, "MEDIUM")
-        self.assertIn("50s", decision.reason)
+        self.assertIn("58s", decision.reason)
 
     def test_high_density_decision(self):
-        """Test that HIGH density returns 70s GREEN timing."""
+        """Test that HIGH density starts at 70s and adds demand timing."""
         decision = self.engine.evaluate(
             input_data="HIGH", vehicle_count=8, density_percentage=85.0
         )
         self.assertEqual(decision.signal, "GREEN")
-        self.assertEqual(decision.duration, 70)
+        self.assertEqual(decision.duration, 86)
         self.assertEqual(decision.density_level, "HIGH")
-        self.assertIn("70s", decision.reason)
+        self.assertIn("86s", decision.reason)
 
     def test_evaluation_with_density_metrics_object(self):
         """Test evaluate() when passed a DensityMetrics object directly."""
@@ -86,7 +86,7 @@ class TestSignalDecisionEngine(unittest.TestCase):
         )
 
         decision = self.engine.evaluate(metrics)
-        self.assertEqual(decision.duration, 70)
+        self.assertEqual(decision.duration, 88)
         self.assertEqual(decision.density_level, "HIGH")
         self.assertEqual(decision.vehicle_count, 9)
 
@@ -104,6 +104,30 @@ class TestSignalDecisionEngine(unittest.TestCase):
 
         res_high = custom_engine.evaluate("HIGH")
         self.assertEqual(res_high.duration, 60)
+
+    def test_nine_vehicles_get_more_time_on_one_path_than_two(self):
+        one_path = self.engine.evaluate(
+            "HIGH", vehicle_count=9, density_percentage=90.0, road_path_count=1
+        )
+        two_paths = self.engine.evaluate(
+            "MEDIUM", vehicle_count=9, density_percentage=45.0, road_path_count=2
+        )
+
+        self.assertEqual(one_path.duration, 88)
+        self.assertEqual(two_paths.duration, 64)
+        self.assertGreater(one_path.duration, two_paths.duration)
+
+    def test_equal_density_with_different_demand_gets_different_time(self):
+        ten_on_one = self.engine.evaluate(
+            "HIGH", vehicle_count=10, density_percentage=100.0, road_path_count=1
+        )
+        twenty_on_two = self.engine.evaluate(
+            "HIGH", vehicle_count=20, density_percentage=100.0, road_path_count=2
+        )
+
+        self.assertEqual(ten_on_one.duration, 90)
+        self.assertEqual(twenty_on_two.duration, 100)
+        self.assertNotEqual(ten_on_one.duration, twenty_on_two.duration)
 
     def test_strategy_swapping(self):
         """Test swapping to a custom strategy."""

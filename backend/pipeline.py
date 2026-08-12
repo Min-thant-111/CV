@@ -19,6 +19,7 @@ from backend.mqtt.mqtt_publisher import MQTTPublisher
 from backend.models.density import DensityMetrics
 from backend.models.signaling import SignalDecision
 from backend.models.tracking import FrameTracks
+from backend.road.path_estimator import RoadPathEstimator
 
 logger = logging.getLogger("TrafficPipeline")
 
@@ -78,12 +79,27 @@ class TrafficPipeline:
             model_path=self.config.model_path,
             confidence_threshold=self.config.confidence_threshold,
             device=self.config.device,
+            inference_size=self.config.inference_size,
+            iou_threshold=self.config.iou_threshold,
         )
 
         # ── Tracker ─────────────────────────────────────────────────
         self._tracker = VehicleTracker(
             detector=self._detector,
             tracker_type=self.config.tracker_type,
+            high_recall=self.config.high_recall_tiling,
+            tile_inference_size=self.config.tile_inference_size,
+            tile_confidence_threshold=self.config.tile_confidence_threshold,
+            tile_grid_size=self.config.tile_grid_size,
+            tile_interval_frames=self.config.tile_interval_frames,
+            detection_memory_frames=self.config.detection_memory_frames,
+            class_history_frames=self.config.class_history_frames,
+            heavy_vehicle_min_confidence=self.config.heavy_vehicle_min_confidence,
+            heavy_vehicle_min_observations=self.config.heavy_vehicle_min_observations,
+            class_switch_margin=self.config.class_switch_margin,
+            suppress_camera_overlay=self.config.suppress_camera_overlay,
+            overlay_top_fraction=self.config.overlay_top_fraction,
+            overlay_left_fraction=self.config.overlay_left_fraction,
         )
 
         # ── Density Engine ──────────────────────────────────────────
@@ -180,12 +196,20 @@ class TrafficPipeline:
         )
 
         meta = processor.metadata
+        path_estimate = RoadPathEstimator().estimate_video(path)
+        self.config.density.road_path_count = path_estimate.path_count
+        self._density_engine.config.road_path_count = path_estimate.path_count
         logger.info(
             f"Video loaded: {meta.path} | "
             f"{meta.width}x{meta.height} | "
             f"{meta.fps:.1f} FPS | "
             f"{meta.total_frames} frames | "
             f"{meta.duration_seconds:.1f}s"
+        )
+        logger.info(
+            "Automatically detected %d road path(s) (confidence %.1f%%).",
+            path_estimate.path_count,
+            path_estimate.confidence * 100,
         )
 
         self.connect_mqtt()

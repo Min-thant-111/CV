@@ -84,6 +84,9 @@ A modular, edge-deployable computer-vision and IoT framework that:
 │   ├── tracking/
 │   │   └── tracker.py           # ByteTrack vehicle tracker (Ultralytics)
 │   │
+│   ├── road/
+│   │   └── path_estimator.py    # Automatic multi-frame road-path detection
+│   │
 │   ├── density/
 │   │   └── density_engine.py    # PCU-weighted density estimator + ROI support
 │   │
@@ -114,6 +117,7 @@ A modular, edge-deployable computer-vision and IoT framework that:
 │   ├── test_video.py            # VideoReader and VideoProcessor tests
 │   ├── test_detection.py        # YOLODetector tests (mocked inference)
 │   ├── test_tracking.py         # ByteTrack tests (mocked tracking)
+│   ├── test_road_paths.py       # Automatic road-path estimator tests
 │   ├── test_density.py          # DensityEngine tests (LOW/MEDIUM/HIGH)
 │   ├── test_signaling.py        # SignalDecisionEngine tests
 │   ├── test_mqtt.py             # MQTTPublisher tests (mocked client)
@@ -234,11 +238,21 @@ The controller subscribes to `traffic/intersection1/signal` and displays the `GR
 
 The signal engine implements the **Strategy Pattern** and defaults to a rule-based strategy:
 
-| Density Level | PCU Threshold | Recommended GREEN |
-|---------------|--------------|-------------------|
+| Density Level | PCU Threshold | Base GREEN |
+|---------------|--------------|------------|
 | LOW | < 35% occupancy | 30 seconds |
 | MEDIUM | 35% – 70% | 50 seconds |
-| HIGH | > 70% occupancy | 70 seconds |
+| HIGH | ≥ 70% occupancy | 70 seconds |
+
+The final green time is adaptive rather than fixed:
+
+`base time + total-vehicle adjustment + vehicles-per-path adjustment`
+
+With the default adjustments, 9 vehicles on one path receive 88 seconds,
+while 9 vehicles across two paths receive 64 seconds. Total vehicle count is
+also included separately, so two cases with the same density percentage do not
+automatically receive the same green time. The configurable safety bounds are
+still applied last.
 
 ### PCU Weights (Passenger Car Units)
 
@@ -249,9 +263,16 @@ The signal engine implements the **Strategy Pattern** and defaults to a rule-bas
 | Bus | 5 | 2.5 |
 | Truck | 7 | 3.0 |
 
-Density percentage = `(total PCU in frame / road capacity) × 100`
+Density percentage = `(total PCU in frame / (capacity per path × path count)) × 100`
 
-Default road capacity = `10.0 PCU` (configurable in `DensityConfig`).
+Default capacity is `10.0 PCU` per path (configurable in `DensityConfig`). Values
+above 100% are retained to show demand beyond road capacity. For example, 30
+cars on one path is 300%, while the same 30 cars on three paths is 100%.
+
+The path count is detected automatically from multiple frames of each input
+video by finding persistent perspective-aligned lane and road boundaries. When
+the video does not contain enough reliable boundary evidence, the estimator
+uses a conservative one-path fallback and reports low confidence.
 
 ---
 
@@ -284,7 +305,7 @@ python -m unittest discover tests -v
 Expected output:
 
 ```
-Ran 53 tests in ~5s
+Ran 73 tests in ~12s
 
 OK
 ```

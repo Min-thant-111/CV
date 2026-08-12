@@ -20,6 +20,16 @@
   const progressLabel   = document.getElementById('progress-label');
   const frameLabel      = document.getElementById('frame-label');
   const headerBadge     = document.getElementById('header-status-badge');
+  const sourceVideo     = document.getElementById('source-video');
+  const sourceEmpty     = document.getElementById('source-empty');
+  const sourceCaption   = document.getElementById('source-caption');
+  const outputVideo     = document.getElementById('output-video');
+  const outputPreview   = document.getElementById('output-preview');
+  const outputEmpty     = document.getElementById('output-empty');
+  const outputCaption   = document.getElementById('output-caption');
+  const uploadLibrary   = document.getElementById('upload-library');
+  const outputLibrary   = document.getElementById('output-library');
+  const refreshLibrary  = document.getElementById('refresh-library');
 
   // Metadata
   const metaGrid    = document.getElementById('meta-grid');
@@ -41,6 +51,7 @@
   const densityPct    = document.getElementById('density-pct');
   const densityBadge  = document.getElementById('density-level-badge');
   const vehicleCount  = document.getElementById('vehicle-count');
+  const densityPathCount = document.getElementById('density-path-count');
 
   // Vehicle breakdown
   const CLASSES = ['car', 'motorcycle', 'bus', 'truck'];
@@ -48,6 +59,15 @@
   /* ── State ──────────────────────────────────────── */
   let selectedFile = null;
   let activeSSE    = null;
+  let selectedObjectUrl = null;
+  let activeJobId = null;
+  let statusPollTimer = null;
+  let jobFinished = false;
+  let previewPollTimer = null;
+  let previewPollBusy = false;
+  let previewVersion = 0;
+  let previewJobId = null;
+  let previewObjectUrl = null;
 
   /* ── Gauge Constants ────────────────────────────── */
   // Arc path: M 20 100 A 80 80 0 0 1 180 100  →  circumference ≈ 251
@@ -81,6 +101,14 @@
     fileInfo.classList.remove('hidden');
     analyseBtn.disabled = false;
     resetResults();
+    if (selectedObjectUrl) URL.revokeObjectURL(selectedObjectUrl);
+    selectedObjectUrl = URL.createObjectURL(file);
+    if (/\.(avi|mkv|mov)$/i.test(file.name)) {
+      clearVideo('source', 'This format needs browser conversion. The preview will appear after upload.');
+    } else {
+      showVideo('source', selectedObjectUrl, `${file.name} (local preview)`);
+    }
+    clearVideo('output', 'The annotated result will appear here after analysis.');
   }
 
   /* ── Upload & Analyse ───────────────────────────── */
@@ -90,12 +118,15 @@
   });
 
   function startAnalysis(file) {
+    stopJobMonitoring();
+    jobFinished = false;
     analyseBtn.disabled = true;
     btnLabel.textContent = 'Uploading…';
     btnSpinner.classList.remove('hidden');
 
     setStatus('Uploading video…', 'processing');
     setProgress(0);
+    clearVideo('output', 'Analysis is running. The processed video will appear automatically.');
 
     const formData = new FormData();
     formData.append('video', file);
@@ -113,9 +144,15 @@
     xhr.addEventListener('load', () => {
       if (xhr.status === 202) {
         const data = JSON.parse(xhr.responseText);
+        showPlayableVideo('source', data.source_url, data.filename);
+        if (selectedObjectUrl) {
+          URL.revokeObjectURL(selectedObjectUrl);
+          selectedObjectUrl = null;
+        }
         btnLabel.textContent = 'Processing…';
         setStatus('Upload complete. Starting analysis pipeline…', 'processing');
         setProgress(0);
+        startOutputPreview(data.job_id);
         openSSEStream(data.job_id);
       } else {
         let msg = 'Upload failed.';
@@ -136,6 +173,7 @@
   /* ── SSE Stream ─────────────────────────────────── */
   function openSSEStream(jobId) {
     if (activeSSE) activeSSE.close();
+    activeJobId = jobId;
 
     activeSSE = new EventSource(`/api/stream/${jobId}`);
 
@@ -146,24 +184,70 @@
 
     activeSSE.addEventListener('done', (e) => {
       const data = JSON.parse(e.data);
-      handleEvent(data);
-      setStatus('✅ Analysis complete!', 'done');
-      setProgress(100, '100%');
-      resetButton(true);
-      activeSSE.close();
+      completeAnalysis(data);
     });
 
     activeSSE.addEventListener('error', (e) => {
-      let msg = 'Pipeline error occurred.';
-      try { msg = JSON.parse(e.data).message || msg; } catch (_) {}
-      setStatus(`❌ Error: ${msg}`, 'error');
-      resetButton();
-      activeSSE.close();
+      // Custom pipeline errors contain data. Native connection errors do not;
+      // polling continues so a transient SSE disconnect cannot lose completion.
+      if (e.data) {
+        let msg = 'Pipeline error occurred.';
+        try { msg = JSON.parse(e.data).message || msg; } catch (_) {}
+        failAnalysis(msg);
+      }
     });
 
-    activeSSE.onerror = () => {
-      // SSE connection closed after done — expected
-    };
+    statusPollTimer = window.setInterval(() => pollJobStatus(jobId), 1000);
+  }
+
+  async function pollJobStatus(jobId) {
+    if (jobFinished || jobId !== activeJobId) return;
+    try {
+      const response = await fetch(`/api/status/${jobId}`, { cache: 'no-store' });
+      if (!response.ok) return;
+      const job = await response.json();
+      if (job.status === 'done') completeAnalysis(job.result || {});
+      if (job.status === 'error') {
+        failAnalysis((job.result && job.result.message) || 'Pipeline error occurred.');
+      }
+    } catch (_) {
+      // The next poll retries while SSE remains the primary live channel.
+    }
+  }
+
+  async function completeAnalysis(data) {
+    if (jobFinished) return;
+    jobFinished = true;
+    handleEvent(data);
+    setStatus('✅ Analysis complete!', 'done');
+    setProgress(100, '100%');
+    resetButton(true);
+    stopJobMonitoring();
+    if (data.output_url) {
+      await showPlayableVideo(
+        'output', `${data.output_url}?v=${Date.now()}`, 'Annotated analysis result'
+      );
+    } else {
+      clearVideo('output', 'Analysis completed, but no processed video URL was returned.');
+    }
+    await loadVideoLibrary();
+  }
+
+  function failAnalysis(message) {
+    if (jobFinished) return;
+    jobFinished = true;
+    setStatus(`❌ Error: ${message}`, 'error');
+    resetButton();
+    stopJobMonitoring();
+  }
+
+  function stopJobMonitoring() {
+    if (activeSSE) activeSSE.close();
+    activeSSE = null;
+    if (statusPollTimer !== null) window.clearInterval(statusPollTimer);
+    statusPollTimer = null;
+    activeJobId = null;
+    stopOutputPreview(false);
   }
 
   /* ── Event Handler ──────────────────────────────── */
@@ -194,8 +278,15 @@
         }
         setStatus(
           `Processing frame ${data.frame_index} | ` +
-          `${data.vehicle_count} vehicle${data.vehicle_count !== 1 ? 's' : ''} detected | ` +
-          `MQTT ${data.mqtt_published ? '✓' : '–'}`,
+          `Peak ${data.vehicle_count} vehicle${data.vehicle_count !== 1 ? 's' : ''}` +
+          (data.active_vehicle_count !== undefined
+            ? ` | ${data.active_vehicle_count} active now`
+            : '') +
+          ` | ` +
+          `MQTT ${data.mqtt_published ? '✓' : '–'}` +
+          (data.eta_seconds !== undefined
+            ? ` | ETA ${formatDuration(data.eta_seconds)}`
+            : ''),
           'processing'
         );
         break;
@@ -212,7 +303,16 @@
 
     // Gauge arc: dasharray = (pct/100) * GAUGE_TOTAL
     const filled = Math.round((pct / 100) * GAUGE_TOTAL);
-    gaugeArc.setAttribute('stroke-dasharray', `${filled} ${GAUGE_TOTAL - filled}`);
+    const boundedFill = Math.max(0, Math.min(GAUGE_TOTAL, filled));
+    gaugeArc.setAttribute('stroke-dasharray', `${boundedFill} ${GAUGE_TOTAL - boundedFill}`);
+    if (data.road_path_count !== undefined) {
+      const confidence = data.road_path_confidence;
+      densityPathCount.textContent = confidence !== undefined
+        ? `${data.road_path_count} (${Math.round(confidence * 100)}% confidence)`
+        : data.road_path_count;
+    } else {
+      densityPathCount.textContent = '—';
+    }
 
     // Colour by level
     const levelKey = level.toLowerCase();
@@ -256,6 +356,170 @@
     });
   }
 
+  /* Video playback and library */
+  function stopOutputPreview(hide = false) {
+    previewJobId = null;
+    if (previewPollTimer !== null) window.clearInterval(previewPollTimer);
+    previewPollTimer = null;
+    if (hide) {
+      outputPreview.classList.add('hidden');
+      outputPreview.removeAttribute('src');
+      if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+      previewObjectUrl = null;
+    }
+  }
+
+  function startOutputPreview(jobId) {
+    stopOutputPreview(true);
+    previewJobId = jobId;
+    previewVersion = 0;
+
+    const poll = async () => {
+      if (previewPollBusy || previewJobId !== jobId) return;
+      previewPollBusy = true;
+      try {
+        const response = await fetch(
+          `/api/preview/${jobId}?since=${previewVersion}`,
+          { cache: 'no-store' }
+        );
+        if (response.status === 204) return;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const version = Number(response.headers.get('X-Preview-Version') || 0);
+        const frameNumber = Number(response.headers.get('X-Preview-Frame') || 0);
+        const blob = await response.blob();
+        if (previewJobId !== jobId) return;
+        const objectUrl = URL.createObjectURL(blob);
+        if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = objectUrl;
+        previewVersion = version;
+        outputPreview.src = objectUrl;
+        outputPreview.classList.remove('hidden');
+        outputVideo.classList.add('hidden');
+        outputEmpty.classList.add('hidden');
+        outputCaption.textContent = frameNumber >= 0
+          ? `Live analysed frame ${frameNumber}`
+          : 'Preparing vehicle detection…';
+        outputCaption.classList.remove('hidden');
+      } catch (_) {
+        // A later poll retries; metric updates continue over SSE.
+      } finally {
+        previewPollBusy = false;
+      }
+    };
+
+    poll();
+    previewPollTimer = window.setInterval(poll, 750);
+  }
+
+  function showVideo(kind, url, caption) {
+    const video = kind === 'source' ? sourceVideo : outputVideo;
+    const empty = kind === 'source' ? sourceEmpty : outputEmpty;
+    const captionEl = kind === 'source' ? sourceCaption : outputCaption;
+    if (kind === 'output') stopOutputPreview(true);
+    video.src = url;
+    video.classList.remove('hidden');
+    empty.classList.add('hidden');
+    captionEl.textContent = caption;
+    captionEl.classList.remove('hidden');
+    video.onerror = () => {
+      video.classList.add('hidden');
+      empty.textContent = 'The browser could not decode this video. Check the server conversion error.';
+      empty.classList.remove('hidden');
+    };
+    video.load();
+  }
+
+  function playbackUrl(url) {
+    const value = String(url || '');
+    if (/^\/media\/(uploads|outputs)\//.test(value)) {
+      return value.replace('/media/', '/media/play/');
+    }
+    return value;
+  }
+
+  async function showPlayableVideo(kind, url, caption) {
+    const playable = playbackUrl(url);
+    const separator = playable.includes('?') ? '&' : '?';
+    const checkedUrl = `${playable}${separator}media_check=${Date.now()}`;
+    clearVideo(kind, 'Preparing browser-compatible video…');
+    try {
+      const response = await fetch(checkedUrl, {
+        headers: { Range: 'bytes=0-0' },
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        let detail = `HTTP ${response.status}`;
+        try { detail = (await response.json()).error || detail; } catch (_) {}
+        throw new Error(detail);
+      }
+      await response.arrayBuffer();
+      showVideo(kind, checkedUrl, caption);
+    } catch (error) {
+      clearVideo(kind, `Video preparation failed: ${error.message}`);
+    }
+  }
+
+  function clearVideo(kind, message) {
+    const video = kind === 'source' ? sourceVideo : outputVideo;
+    const empty = kind === 'source' ? sourceEmpty : outputEmpty;
+    const captionEl = kind === 'source' ? sourceCaption : outputCaption;
+    if (kind === 'output') stopOutputPreview(true);
+    video.onerror = null;
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    video.classList.add('hidden');
+    captionEl.classList.add('hidden');
+    empty.textContent = message;
+    empty.classList.remove('hidden');
+  }
+
+  function renderVideoList(container, items, kind) {
+    container.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement('div');
+      empty.className = 'video-list-empty';
+      empty.textContent = 'No videos found.';
+      container.appendChild(empty);
+      return;
+    }
+    items.forEach((item) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'video-list-item';
+      const name = document.createElement('span');
+      name.className = 'video-item-name';
+      name.textContent = item.path;
+      const size = document.createElement('span');
+      size.className = 'video-item-size';
+      size.textContent = formatBytes(item.size);
+      button.append(name, size);
+      button.addEventListener('click', () => showPlayableVideo(kind, item.url, item.path));
+      container.appendChild(button);
+    });
+  }
+
+  async function loadVideoLibrary() {
+    try {
+      const response = await fetch('/api/videos', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      renderVideoList(uploadLibrary, data.uploads || [], 'source');
+      renderVideoList(outputLibrary, data.outputs || [], 'output');
+      if (!sourceVideo.getAttribute('src') && data.uploads && data.uploads.length) {
+        showPlayableVideo('source', data.uploads[0].url, data.uploads[0].path);
+      }
+      if (!outputVideo.getAttribute('src') && data.outputs && data.outputs.length) {
+        showPlayableVideo('output', data.outputs[0].url, data.outputs[0].path);
+      }
+    } catch (_) {
+      uploadLibrary.textContent = 'Could not load the video library.';
+      outputLibrary.textContent = 'Could not load the video library.';
+    }
+  }
+
+  refreshLibrary.addEventListener('click', loadVideoLibrary);
+
   /* ── Helpers ─────────────────────────────────────── */
   function setStatus(msg, state) {
     statusMessage.textContent = msg;
@@ -297,6 +561,7 @@
     densityBadge.textContent = '—';
     densityBadge.className   = 'density-level-badge';
     vehicleCount.textContent = '—';
+    densityPathCount.textContent = '—';
     gaugeArc.setAttribute('stroke-dasharray', `0 ${GAUGE_TOTAL}`);
     CLASSES.forEach((cls) => {
       const countEl = document.getElementById(`count-${cls}`);
@@ -311,5 +576,14 @@
     if (bytes < 1048576)    return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;
   }
+
+  function formatDuration(seconds) {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    const minutes = Math.floor(total / 60);
+    const remainder = total % 60;
+    return minutes ? `${minutes}m ${remainder}s` : `${remainder}s`;
+  }
+
+  loadVideoLibrary();
 
 })();

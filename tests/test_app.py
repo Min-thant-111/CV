@@ -8,6 +8,8 @@ The pipeline worker thread is mocked so tests are fast and deterministic.
 import io
 import json
 import os
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -15,7 +17,7 @@ from unittest.mock import patch
 os.environ.setdefault("MQTT_BROKER_HOST", "localhost")
 os.environ.setdefault("MQTT_BROKER_PORT", "1883")
 
-from backend.app import app
+from backend.app import app, _jobs, _jobs_lock
 
 
 def _mp4_upload(client, filename="traffic.mp4", content=b"\x00" * 64):
@@ -33,7 +35,24 @@ class TestFlaskRoutes(unittest.TestCase):
 
     def setUp(self):
         app.config["TESTING"] = True
+        self.temp_dir = tempfile.TemporaryDirectory()
+        temp_root = Path(self.temp_dir.name)
+        self.upload_dir = temp_root / "videos"
+        self.output_dir = temp_root / "outputs"
+        self.upload_dir.mkdir()
+        self.output_dir.mkdir()
+        self.directory_patches = [
+            patch("backend.app.UPLOAD_DIR", self.upload_dir),
+            patch("backend.app.OUTPUT_DIR", self.output_dir),
+        ]
+        for directory_patch in self.directory_patches:
+            directory_patch.start()
         self.client = app.test_client()
+
+    def tearDown(self):
+        for directory_patch in reversed(self.directory_patches):
+            directory_patch.stop()
+        self.temp_dir.cleanup()
 
     # ── GET / ──────────────────────────────────────────────────────────
 
@@ -68,7 +87,14 @@ class TestFlaskRoutes(unittest.TestCase):
         body = json.loads(resp.data)
         self.assertIn("job_id", body)
         self.assertIn("filename", body)
+        self.assertIn("source_url", body)
         self.assertEqual(body["filename"], "traffic.mp4")
+
+        raw_url = body["source_url"].replace("/media/play/", "/media/")
+        media = self.client.get(raw_url)
+        self.assertEqual(media.status_code, 200)
+        self.assertEqual(media.data, b"\x00" * 64)
+        media.close()
 
     @patch("backend.app._run_pipeline")
     def test_upload_valid_avi_returns_202(self, mock_run):
@@ -83,6 +109,41 @@ class TestFlaskRoutes(unittest.TestCase):
         """Status for a non-existent job_id must return 404."""
         resp = self.client.get("/api/status/nonexistent")
         self.assertEqual(resp.status_code, 404)
+
+    def test_video_library_returns_uploads_and_outputs(self):
+        """The UI media library endpoint must expose both collections."""
+        resp = self.client.get("/api/videos")
+        self.assertEqual(resp.status_code, 200)
+        body = json.loads(resp.data)
+        self.assertIn("uploads", body)
+        self.assertIn("outputs", body)
+        self.assertTrue(all("url" in item for item in body["outputs"]))
+
+    def test_unknown_media_collection_returns_404(self):
+        resp = self.client.get("/media/private/video.mp4")
+        self.assertEqual(resp.status_code, 404)
+
+    @patch("backend.app._run_pipeline")
+    def test_live_preview_returns_only_new_annotated_frame(self, mock_run):
+        mock_run.return_value = None
+        upload = _mp4_upload(self.client)
+        job_id = json.loads(upload.data)["job_id"]
+
+        self.assertEqual(self.client.get(f"/api/preview/{job_id}").status_code, 204)
+        with _jobs_lock:
+            _jobs[job_id]["preview"] = b"jpeg-data"
+            _jobs[job_id]["preview_version"] = 7
+            _jobs[job_id]["preview_frame"] = 12
+
+        preview = self.client.get(f"/api/preview/{job_id}?since=0")
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.content_type, "image/jpeg")
+        self.assertEqual(preview.headers["X-Preview-Version"], "7")
+        self.assertEqual(preview.headers["X-Preview-Frame"], "12")
+        self.assertEqual(preview.data, b"jpeg-data")
+        self.assertEqual(
+            self.client.get(f"/api/preview/{job_id}?since=7").status_code, 204
+        )
 
     @patch("backend.app._run_pipeline")
     def test_status_known_job_returns_200(self, mock_run):

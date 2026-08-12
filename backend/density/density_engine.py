@@ -35,10 +35,11 @@ class DensityConfig:
     vehicle_weights: Dict[str, float] = field(
         default_factory=lambda: dict(DEFAULT_VEHICLE_WEIGHTS)
     )
-    max_road_capacity_units: float = 10.0  # PCU capacity of road segment/view
+    max_road_capacity_units: float = 10.0  # PCU capacity per road path
     low_threshold_pct: float = 35.0        # < 35% is LOW density
     high_threshold_pct: float = 70.0       # >= 70% is HIGH density (35%-70% is MEDIUM)
     roi_polygon: Optional[List[Tuple[float, float]]] = None  # Polygon coordinates for ROI filtering
+    road_path_count: int = 1               # Parallel paths/ways visible in the road
 
 
 class DensityEngineError(Exception):
@@ -109,10 +110,14 @@ class DensityEngine:
 
             active_track_ids.append(track.track_id)
 
-        # 3. Calculate density percentage relative to max road capacity
-        capacity = max(0.1, self.config.max_road_capacity_units)
+        # 3. Each parallel road path adds usable capacity.  Do not clamp the
+        # demand ratio to 100%; otherwise, for example, 30 cars on one path and
+        # 30 cars on three paths both collapse to 100% and become indistinguishable.
+        road_path_count = max(1, int(self.config.road_path_count))
+        capacity_per_path = max(0.1, self.config.max_road_capacity_units)
+        capacity = capacity_per_path * road_path_count
         density_pct = (weighted_units / capacity) * 100.0
-        density_pct = min(100.0, round(density_pct, 2))
+        density_pct = round(density_pct, 2)
 
         # 4. Classify density level (LOW, MEDIUM, HIGH)
         if density_pct < self.config.low_threshold_pct:
@@ -132,4 +137,5 @@ class DensityEngine:
             density_percentage=density_pct,
             density_level=density_level,
             active_track_ids=active_track_ids,
+            road_path_count=road_path_count,
         )

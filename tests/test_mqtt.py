@@ -43,7 +43,7 @@ class TestMQTTModule(unittest.TestCase):
 
         success = publisher.connect()
         self.assertTrue(success)
-        mock_instance.connect.assert_called_once_with(
+        mock_instance.connect_async.assert_called_once_with(
             host="localhost", port=1883, keepalive=60
         )
         mock_instance.loop_start.assert_called_once()

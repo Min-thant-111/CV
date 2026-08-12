@@ -138,7 +138,7 @@
               <div id="density-level-badge" class="density-level-badge">—</div>
             </div>
           </div>
-          <div id="density-vehicles" class="density-total">Total vehicles: <strong id="vehicle-count">—</strong></div>
+          <div id="density-vehicles" class="density-total">Total vehicles: <strong id="vehicle-count">—</strong> · Detected paths: <strong id="density-path-count">—</strong></div>
         </div>
       </div>
 
@@ -188,12 +188,39 @@
 
   </main>
 
+  <section class="video-workspace" aria-label="Video viewer">
+    <div class="card video-card">
+      <div class="card-header"><span class="card-icon">&#127909;</span><h2 class="card-title">Uploaded Video</h2></div>
+      <div id="source-empty" class="video-empty">Select a video to preview it here.</div>
+      <video id="source-video" class="media-player hidden" controls preload="metadata"></video>
+      <div id="source-caption" class="video-caption hidden"></div>
+    </div>
+    <div class="card video-card">
+      <div class="card-header"><span class="card-icon">&#10024;</span><h2 class="card-title">Processed / Evaluated Video</h2></div>
+      <div id="output-empty" class="video-empty">The annotated result will appear here after analysis.</div>
+      <img id="output-preview" class="media-player live-preview hidden"
+        alt="Live annotated processing preview" />
+      <video id="output-video" class="media-player hidden" controls preload="metadata"></video>
+      <div id="output-caption" class="video-caption hidden"></div>
+    </div>
+    <div class="card media-library-card">
+      <div class="card-header library-header">
+        <div class="library-title"><span class="card-icon">&#128193;</span><h2 class="card-title">Video Library</h2></div>
+        <button id="refresh-library" class="btn-icon" type="button">Refresh</button>
+      </div>
+      <div class="library-columns">
+        <div><h3 class="library-subtitle">Uploads</h3><div id="upload-library" class="video-list"></div></div>
+        <div><h3 class="library-subtitle">Processed / Evaluated</h3><div id="output-library" class="video-list"></div></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── FOOTER ────────────────────────────────────────────── -->
   <footer class="footer">
     <span>An IoT-Enabled Edge-CV Framework for Real-Time Traffic Density Estimation and Intelligent Signaling</span>
   </footer>
 
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=5"></script>
 </body>
 
 </html>

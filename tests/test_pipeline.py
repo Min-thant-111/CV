@@ -171,7 +171,7 @@ class TestTrafficPipelineIntegration(unittest.TestCase):
         density_low = pipeline._density_engine.compute_density(low_tracks)
         decision_low = pipeline._signal_engine.evaluate(density_low)
         self.assertEqual(density_low.density_level, "LOW")
-        self.assertEqual(decision_low.duration, 30)
+        self.assertEqual(decision_low.duration, 32)
 
         # ── MEDIUM: 4 cars = 4.0 PCU → 40% → MEDIUM → 50s ───────────
         medium_tracks = FrameTracks(
@@ -181,7 +181,7 @@ class TestTrafficPipelineIntegration(unittest.TestCase):
         density_med = pipeline._density_engine.compute_density(medium_tracks)
         decision_med = pipeline._signal_engine.evaluate(density_med)
         self.assertEqual(density_med.density_level, "MEDIUM")
-        self.assertEqual(decision_med.duration, 50)
+        self.assertEqual(decision_med.duration, 58)
 
         # ── HIGH: 4 cars + 2 buses = 9.0 PCU → 90% → HIGH → 70s ─────
         high_tracks = FrameTracks(
@@ -198,7 +198,7 @@ class TestTrafficPipelineIntegration(unittest.TestCase):
         density_high = pipeline._density_engine.compute_density(high_tracks)
         decision_high = pipeline._signal_engine.evaluate(density_high)
         self.assertEqual(density_high.density_level, "HIGH")
-        self.assertEqual(decision_high.duration, 70)
+        self.assertEqual(decision_high.duration, 82)
 
     @patch("ultralytics.YOLO")
     def test_pipeline_raises_on_empty_video_path(self, mock_yolo_cls):

@@ -94,6 +94,10 @@ class TestYOLODetector(unittest.TestCase):
         self.assertEqual(frame_dets.detections[0].class_name, "car")
         self.assertEqual(frame_dets.detections[1].class_name, "motorcycle")
         self.assertEqual(frame_dets.get_class_counts(), {"car": 1, "motorcycle": 1})
+        call_kwargs = mock_model_instance.predict.call_args.kwargs
+        self.assertEqual(call_kwargs["imgsz"], 640)
+        self.assertEqual(call_kwargs["iou"], 0.45)
+        self.assertEqual(call_kwargs["classes"], [2, 3, 5, 7])
 
     @patch("ultralytics.YOLO")
     def test_invalid_frame_raises_value_error(self, mock_yolo_cls):

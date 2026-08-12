@@ -24,6 +24,7 @@ class DensityMetrics:
     density_percentage: float
     density_level: str  # "LOW", "MEDIUM", "HIGH"
     active_track_ids: List[int] = field(default_factory=list)
+    road_path_count: int = 1
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert metrics to dictionary representation."""
@@ -36,5 +37,6 @@ class DensityMetrics:
             "capacity_units": round(self.capacity_units, 2),
             "density_percentage": round(self.density_percentage, 2),
             "density_level": self.density_level,
+            "road_path_count": self.road_path_count,
             "active_track_ids": self.active_track_ids,
         }

@@ -69,7 +69,7 @@ class TestDensityEngine(unittest.TestCase):
         self.assertEqual(res.density_level, "MEDIUM")
 
     def test_high_density_case(self):
-        """Test HIGH traffic density case (4 Cars + 2 Buses + 1 Truck = 12.0 PCU -> 100% capped)."""
+        """Demand above capacity remains visible instead of being capped at 100%."""
         tracks = [
             TrackedObject(track_id=1, class_id=2, class_name="car", confidence=0.9, bbox=(0, 0, 10, 10)),
             TrackedObject(track_id=2, class_id=2, class_name="car", confidence=0.9, bbox=(10, 10, 20, 20)),
@@ -84,8 +84,24 @@ class TestDensityEngine(unittest.TestCase):
 
         self.assertEqual(res.total_vehicle_count, 7)
         self.assertEqual(res.weighted_vehicle_units, 12.0)
-        self.assertEqual(res.density_percentage, 100.0)
+        self.assertEqual(res.density_percentage, 120.0)
         self.assertEqual(res.density_level, "HIGH")
+
+    def test_same_vehicle_count_has_lower_density_across_more_paths(self):
+        tracks = [
+            TrackedObject(i, 2, "car", 0.9, (0, 0, 10, 10))
+            for i in range(1, 31)
+        ]
+        frame_tracks = FrameTracks(frame_index=0, timestamp=0.0, tracks=tracks)
+
+        one_path = DensityEngine(DensityConfig(road_path_count=1)).compute_density(frame_tracks)
+        three_paths = DensityEngine(DensityConfig(road_path_count=3)).compute_density(frame_tracks)
+
+        self.assertEqual(one_path.density_percentage, 300.0)
+        self.assertEqual(three_paths.density_percentage, 100.0)
+        self.assertGreater(one_path.density_percentage, three_paths.density_percentage)
+        self.assertEqual(three_paths.road_path_count, 3)
+        self.assertEqual(three_paths.capacity_units, 30.0)
 
     def test_roi_polygon_filtering(self):
         """Test that objects outside the ROI polygon are ignored."""

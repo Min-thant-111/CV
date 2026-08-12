@@ -39,7 +39,9 @@ class YOLODetector:
         model_path: str = "models/yolov8n.pt",
         confidence_threshold: float = 0.35,
         target_classes: Optional[Dict[int, str]] = None,
-        device: str = "cpu",
+        device: Optional[str] = None,
+        inference_size: int = 640,
+        iou_threshold: float = 0.45,
     ):
         """Args:
 
@@ -52,6 +54,8 @@ class YOLODetector:
         self.confidence_threshold = confidence_threshold
         self.target_classes = target_classes or DEFAULT_TARGET_CLASSES
         self.device = device
+        self.inference_size = max(320, int(inference_size))
+        self.iou_threshold = min(1.0, max(0.05, float(iou_threshold)))
         self.model = None
 
         self._load_model()
@@ -100,6 +104,9 @@ class YOLODetector:
         results = self.model.predict(
             source=frame,
             conf=self.confidence_threshold,
+            iou=self.iou_threshold,
+            imgsz=self.inference_size,
+            classes=list(self.target_classes),
             device=self.device,
             verbose=False,
         )

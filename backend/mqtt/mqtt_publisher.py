@@ -119,9 +119,12 @@ class MQTTPublisher:
 
         try:
             logger.info(
-                f"Connecting to MQTT Broker at {self.config.broker_host}:{self.config.broker_port}..."
+                f"Connecting asynchronously to MQTT Broker at "
+                f"{self.config.broker_host}:{self.config.broker_port}..."
             )
-            self.client.connect(
+            # Broker availability must never hold up CV inference. Paho's
+            # network loop completes the connection (and retries) in parallel.
+            self.client.connect_async(
                 host=self.config.broker_host,
                 port=self.config.broker_port,
                 keepalive=self.config.keepalive,

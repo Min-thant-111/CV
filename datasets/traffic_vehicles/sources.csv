@@ -1,0 +1,9 @@
+source_video,split,sha256,status
+C:\Users\L1\Documents\antigravity\agitated-bohr\videos\0067a136.avi,train,84fef0e4a6cdcade17cf9eafeec6aadc19169109bfdf3e347ed8978fd45f8232,used
+C:\Users\L1\Documents\antigravity\agitated-bohr\videos\256b0149.avi,train,7e48b0ecaed4acea8976a6b91b0f695a0b52d39f3c72a9f2e16e3fb571ee6c4a,used
+C:\Users\L1\Documents\antigravity\agitated-bohr\videos\50e9ee29.avi,train,865c7928ab4b60ac1d66829d2a2b69b2f0f4a4990ce13edc2afc96e9fb352e44,used
+C:\Users\L1\Documents\antigravity\agitated-bohr\videos\c8ffaddb.avi,train,e3c7e12b9c52cbdd6292dcc5877ca8ddd8428b2d7fe1cac30d0d5d4f5827aaa5,used
+C:\Users\L1\Documents\antigravity\agitated-bohr\videos\074aafec.avi,train,4a885c3fca22bb60b89f33e1dd3adcf3a00befcbdc7b5eff88c808354169b00d,used
+C:\Users\L1\Documents\antigravity\agitated-bohr\videos\22e53ee4.avi,val,34437a38c6a6c8370f1ed9aa2e033d722749291a5456aba02b987f6ee9f9c275,used
+C:\Users\L1\Documents\antigravity\agitated-bohr\videos\046d6d25.avi,val,cc5fe3ac6e5a7fc5abbedbd143fe3cdf70c93220025ef51705112ce3e63d7f49,used
+C:\Users\L1\Documents\antigravity\agitated-bohr\videos\04ace9ff.avi,test,ee9dd2980d2fbbbab3e84fc479951c33b7e27495996819d943e86822491c3948,used

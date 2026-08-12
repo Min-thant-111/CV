@@ -16,6 +16,7 @@ class SignalDecision:
     density_percentage: float
     vehicle_count: int
     reason: str
+    road_path_count: int = 1
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert decision to dictionary representation."""
@@ -25,5 +26,6 @@ class SignalDecision:
             "density_level": self.density_level,
             "density_percentage": round(self.density_percentage, 2),
             "vehicle_count": self.vehicle_count,
+            "road_path_count": self.road_path_count,
             "reason": self.reason,
         }
