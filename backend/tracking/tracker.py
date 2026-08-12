@@ -4,6 +4,7 @@ Vehicle Tracker module leveraging Ultralytics ByteTrack for multi-object trackin
 
 from collections import defaultdict, deque
 from typing import Deque, List, Optional, Dict, Set, Tuple
+import cv2
 import numpy as np
 
 from backend.detection.yolo_detector import YOLODetector
@@ -31,6 +32,9 @@ class VehicleTracker:
         tile_confidence_threshold: float = 0.18,
         tile_grid_size: int = 2,
         tile_interval_frames: int = 5,
+        far_field_recall: bool = False,
+        far_field_inference_size: int = 1280,
+        far_field_confidence_threshold: float = 0.05,
         detection_memory_frames: int = 0,
         class_history_frames: int = 12,
         heavy_vehicle_min_confidence: float = 0.30,
@@ -66,6 +70,13 @@ class VehicleTracker:
         )
         self.tile_grid_size = min(3, max(2, int(tile_grid_size)))
         self.tile_interval_frames = max(1, int(tile_interval_frames))
+        self.far_field_recall = bool(far_field_recall)
+        self.far_field_inference_size = max(
+            self.tile_inference_size, int(far_field_inference_size)
+        )
+        self.far_field_confidence_threshold = min(
+            1.0, max(0.01, float(far_field_confidence_threshold))
+        )
         self.detection_memory_frames = max(0, int(detection_memory_frames))
         self.class_history_frames = max(2, int(class_history_frames))
         self.heavy_vehicle_min_confidence = min(
@@ -336,6 +347,76 @@ class VehicleTracker:
             self._deduplicate_class_overlaps(candidates), width, height
         )
 
+    def _far_field_bounds(
+        self, width: int, height: int
+    ) -> List[Tuple[int, int, int, int]]:
+        """Return perspective-shaped zoom crops for tiny distant vehicles.
+
+        The middle crop follows the narrow left roadway where the missed queue
+        appears, while the final shallow crop magnifies the curved horizon.
+        This gives small vehicles substantially more model pixels than regular
+        square tiling without cropping the nearby-road detector's field of view.
+        """
+        return [
+            (0, int(round(height * 0.10)),
+             int(round(width * 0.48)), int(round(height * 0.64))),
+            (int(round(width * 0.30)), int(round(height * 0.10)),
+             int(round(width * 0.66)), int(round(height * 0.75))),
+            (int(round(width * 0.45)), int(round(height * 0.06)),
+             width, int(round(height * 0.46))),
+        ]
+
+    def _far_field_candidates(self, frame: np.ndarray) -> List[TrackedObject]:
+        """Detect low-confidence, distant vehicles on strongly enlarged crops."""
+        height, width = frame.shape[:2]
+        bounds = self._far_field_bounds(width, height)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
+        crops = []
+        for x1, y1, x2, y2 in bounds:
+            crop = frame[y1:y2, x1:x2]
+            # The source CCTV clips are low-resolution and low-contrast. Local
+            # luminance enhancement separates distant vehicle roofs from road
+            # pixels before the crop is enlarged for inference.
+            lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB)
+            luminance, channel_a, channel_b = cv2.split(lab)
+            enhanced = cv2.merge((clahe.apply(luminance), channel_a, channel_b))
+            crops.append(cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR))
+        results = self.detector.model.predict(
+            source=crops,
+            conf=self.far_field_confidence_threshold,
+            iou=self.detector.iou_threshold,
+            imgsz=self.far_field_inference_size,
+            classes=list(self.target_classes),
+            device=self.detector.device,
+            verbose=False,
+        )
+
+        candidates: List[TrackedObject] = []
+        for result, (offset_x, offset_y, _, _) in zip(results or [], bounds):
+            boxes = result.boxes
+            if boxes is None:
+                continue
+            for box in boxes:
+                cls_id = int(box.cls[0].item())
+                if cls_id not in self.target_classes:
+                    continue
+                xyxy = box.xyxy[0].tolist()
+                candidates.append(TrackedObject(
+                    track_id=-1,
+                    class_id=cls_id,
+                    class_name=self.target_classes[cls_id],
+                    confidence=round(float(box.conf[0].item()), 4),
+                    bbox=(
+                        round(xyxy[0] + offset_x, 2),
+                        round(xyxy[1] + offset_y, 2),
+                        round(xyxy[2] + offset_x, 2),
+                        round(xyxy[3] + offset_y, 2),
+                    ),
+                ))
+        return self._filter_camera_overlay_artifacts(
+            self._deduplicate_class_overlaps(candidates), width, height
+        )
+
     def _merge_supplemental(
         self, tracked: List[TrackedObject], candidates: List[TrackedObject]
     ) -> List[TrackedObject]:
@@ -591,8 +672,11 @@ class VehicleTracker:
                 or frame_index % self.tile_interval_frames == 0
             )
             if should_scan_tiles:
+                candidates = self._tile_candidates(frame)
+                if self.far_field_recall:
+                    candidates.extend(self._far_field_candidates(frame))
                 tracks = self._merge_supplemental(
-                    tracks, self._tile_candidates(frame)
+                    tracks, candidates
                 )
                 observed_ids.update(item.track_id for item in tracks)
             else:

@@ -401,6 +401,8 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
         from backend.video.video_processor import VideoProcessor
         from backend.tracking.tracker import VehicleTracker
         from backend.density.density_engine import DensityEngine
+        from backend.density.vehicle_count_estimator import estimate_visible_vehicles
+        from backend.density.traffic_classifier import TrafficDensityClassifier
         from backend.signaling.signal_engine import SignalDecisionEngine
         from backend.mqtt.mqtt_publisher import MQTTPublisher
         from backend.road.path_estimator import RoadPathEstimator
@@ -494,7 +496,13 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
             tile_confidence_threshold=float(os.getenv("TILE_CONFIDENCE", "0.18")),
             tile_grid_size=int(os.getenv("TILE_GRID", "3")),
             tile_interval_frames=int(os.getenv("TILE_INTERVAL", "5")),
-            detection_memory_frames=int(os.getenv("DETECTION_MEMORY", "10")),
+            far_field_recall=os.getenv("FAR_FIELD_RECALL", "true").lower()
+            in {"1", "true", "yes", "on"},
+            far_field_inference_size=int(os.getenv("FAR_FIELD_IMGSZ", "1280")),
+            far_field_confidence_threshold=float(
+                os.getenv("FAR_FIELD_CONFIDENCE", "0.05")
+            ),
+            detection_memory_frames=int(os.getenv("DETECTION_MEMORY", "2")),
             class_history_frames=int(os.getenv("CLASS_HISTORY_FRAMES", "12")),
             heavy_vehicle_min_confidence=float(
                 os.getenv("HEAVY_VEHICLE_MIN_CONFIDENCE", "0.30")
@@ -512,6 +520,21 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
         density_engine = DensityEngine(config=DensityConfig(
             road_path_count=road_path_count,
         ))
+        traffic_classifier = None
+        classifier_path = Path(os.getenv(
+            "TRAFFIC_CLASSIFIER_MODEL",
+            str(BASE_DIR / "models" / "traffic_density_cnn.pt"),
+        ))
+        if classifier_path.is_file():
+            try:
+                traffic_classifier = TrafficDensityClassifier(str(classifier_path))
+                logger.info("[%s] Loaded traffic classifier: %s", job_id, classifier_path)
+            except Exception as error:
+                logger.warning(
+                    "[%s] Traffic classifier unavailable; using geometric calibration: %s",
+                    job_id,
+                    error,
+                )
         signal_engine  = SignalDecisionEngine(config=SignalConfig(
             green_duration_low=int(os.getenv("GREEN_TIME_LOW", "30")),
             green_duration_medium=int(os.getenv("GREEN_TIME_MED", "50")),
@@ -540,11 +563,47 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
         peak_decision = None
         peak_vehicle_count = 0
         peak_class_counts = {}
+        vehicle_observation_sum = 0
+        class_observation_sums = {
+            "car": 0,
+            "motorcycle": 0,
+            "bus": 0,
+            "truck": 0,
+        }
+        traffic_level_scores = {"light": 0.0, "medium": 0.0, "heavy": 0.0}
+        traffic_level = None
+        traffic_level_confidence = 0.0
 
         for frame_index, timestamp, frame in processor.process_frames():
+            if traffic_classifier is not None:
+                predicted_level, predicted_confidence = traffic_classifier.predict(frame)
+                traffic_level_scores[predicted_level] += predicted_confidence
+                traffic_level = max(traffic_level_scores, key=traffic_level_scores.get)
+                score_total = sum(traffic_level_scores.values())
+                traffic_level_confidence = (
+                    traffic_level_scores[traffic_level] / score_total
+                    if score_total > 0 else 0.0
+                )
             frame_tracks  = tracker.track_frame(frame, frame_index, timestamp)
             density       = density_engine.compute_density(frame_tracks)
             decision      = signal_engine.evaluate(density)
+
+            # Adapt the useful statistic from the reference project: detections
+            # accumulated across analysed frames divided by analysed frames.
+            # This is an average concurrent count, not a unique vehicle total.
+            vehicle_observation_sum += density.total_vehicle_count
+            for class_name in class_observation_sums:
+                class_observation_sums[class_name] += density.class_counts.get(
+                    class_name, 0
+                )
+            analyzed_frames = processed + 1
+            average_vehicle_count = round(
+                vehicle_observation_sum / analyzed_frames, 2
+            )
+            average_class_counts = {
+                class_name: round(total / analyzed_frames, 2)
+                for class_name, total in class_observation_sums.items()
+            }
 
             # The last frame is often blurred, occluded, or shows vehicles
             # leaving the image. Preserve the strongest stabilized whole-road
@@ -559,8 +618,20 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
                 peak_vehicle_count = density.total_vehicle_count
                 peak_class_counts = dict(density.class_counts)
 
-            display_density = peak_density or density
-            display_decision = peak_decision or decision
+            count_estimate = estimate_visible_vehicles(
+                peak_vehicle_count,
+                peak_class_counts,
+                meta.width,
+                meta.height,
+                road_path_count,
+                traffic_level=traffic_level,
+            )
+            display_density = density_engine.compute_density_from_counts(
+                count_estimate.class_counts,
+                frame_index=frame_index,
+                timestamp=timestamp,
+            )
+            display_decision = signal_engine.evaluate(display_density)
 
             # Persist a viewable evaluated frame with detections and the decision.
             for track in frame_tracks.tracks:
@@ -579,7 +650,7 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
             cv2.rectangle(frame, (0, 0), (meta.width, header_height), (7, 13, 26), -1)
             cv2.putText(
                 frame,
-                f"Active: {density.total_vehicle_count}  Peak: {peak_vehicle_count}  Density: {display_density.density_level}",
+                f"Detected: {peak_vehicle_count}  Estimated: {count_estimate.estimated_count}  Density: {display_density.density_level}",
                 (8, header_height - 8), cv2.FONT_HERSHEY_SIMPLEX,
                 max(0.36, min(0.55, meta.width / 700)), (235, 242, 255), 1,
                 cv2.LINE_AA,
@@ -596,7 +667,7 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
                 or frame_index >= meta.total_frames - 1
             )
             if should_publish:
-                last_mqtt_ok = mqtt_publisher.publish_signal(decision)
+                last_mqtt_ok = mqtt_publisher.publish_signal(display_decision)
 
             elapsed = max(0.001, time.monotonic() - processing_started)
             processing_fps = processed / elapsed
@@ -611,16 +682,24 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
                 "processed_frames":   processed,
                 "total_frames":       meta.total_frames,
                 "progress_pct":       round(((frame_index + 1) / max(meta.total_frames, 1)) * 100, 1),
-                "vehicle_count":      peak_vehicle_count,
+                "vehicle_count":      count_estimate.estimated_count,
+                "estimated_vehicle_count": count_estimate.estimated_count,
+                "count_correction_factor": count_estimate.correction_factor,
+                "detected_peak_vehicle_count": peak_vehicle_count,
                 "peak_vehicle_count": peak_vehicle_count,
                 "active_vehicle_count": density.total_vehicle_count,
-                "class_counts":       peak_class_counts,
+                "average_vehicle_count": average_vehicle_count,
+                "class_counts":       count_estimate.class_counts,
+                "detected_peak_class_counts": peak_class_counts,
                 "active_class_counts": dict(density.class_counts),
+                "average_class_counts": average_class_counts,
                 "density_percentage": round(display_density.density_percentage, 1),
                 "density_level":      display_density.density_level,
                 "road_path_count":    road_path_count,
                 "road_path_confidence": round(path_estimate.confidence, 3),
                 "road_path_method":   path_estimate.method,
+                "traffic_level":      traffic_level,
+                "traffic_level_confidence": round(traffic_level_confidence, 3),
                 "signal":             display_decision.signal,
                 "green_duration":     display_decision.duration,
                 "reason":             display_decision.reason,

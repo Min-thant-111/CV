@@ -92,23 +92,40 @@ class DensityEngine:
             if self._is_inside_roi(track.bbox):
                 filtered_tracks.append(track)
 
-        # 1. Total unique active vehicle count
-        total_count = len(filtered_tracks)
-
-        # 2. Count breakdown by vehicle class
+        # Count breakdown by vehicle class
         class_counts: Dict[str, int] = {}
-        weighted_units = 0.0
         active_track_ids: List[int] = []
 
         for track in filtered_tracks:
             cls = track.class_name
             class_counts[cls] = class_counts.get(cls, 0) + 1
-
-            # Get vehicle weight (default to 1.0 if unspecified)
-            weight = self.config.vehicle_weights.get(cls, 1.0)
-            weighted_units += weight
-
             active_track_ids.append(track.track_id)
+
+        return self.compute_density_from_counts(
+            class_counts,
+            frame_index=frame_tracks.frame_index,
+            timestamp=frame_tracks.timestamp,
+            active_track_ids=active_track_ids,
+        )
+
+    def compute_density_from_counts(
+        self,
+        class_counts: Dict[str, int],
+        frame_index: int = 0,
+        timestamp: float = 0.0,
+        active_track_ids: Optional[List[int]] = None,
+    ) -> DensityMetrics:
+        """Compute density from measured or calibrated per-class counts."""
+        normalized_counts = {
+            name: max(0, int(count))
+            for name, count in (class_counts or {}).items()
+            if int(count) > 0
+        }
+        total_count = sum(normalized_counts.values())
+        weighted_units = sum(
+            count * self.config.vehicle_weights.get(name, 1.0)
+            for name, count in normalized_counts.items()
+        )
 
         # 3. Each parallel road path adds usable capacity.  Do not clamp the
         # demand ratio to 100%; otherwise, for example, 30 cars on one path and
@@ -128,14 +145,14 @@ class DensityEngine:
             density_level = "HIGH"
 
         return DensityMetrics(
-            frame_index=frame_tracks.frame_index,
-            timestamp=frame_tracks.timestamp,
+            frame_index=frame_index,
+            timestamp=timestamp,
             total_vehicle_count=total_count,
-            class_counts=class_counts,
+            class_counts=normalized_counts,
             weighted_vehicle_units=round(weighted_units, 2),
             capacity_units=capacity,
             density_percentage=density_pct,
             density_level=density_level,
-            active_track_ids=active_track_ids,
+            active_track_ids=active_track_ids or [],
             road_path_count=road_path_count,
         )

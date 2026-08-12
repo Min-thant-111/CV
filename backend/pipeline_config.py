@@ -29,7 +29,10 @@ class PipelineConfig:
     tile_confidence_threshold: float = 0.18
     tile_grid_size: int = 3
     tile_interval_frames: int = 5
-    detection_memory_frames: int = 10
+    far_field_recall: bool = True
+    far_field_inference_size: int = 1280
+    far_field_confidence_threshold: float = 0.05
+    detection_memory_frames: int = 2
     class_history_frames: int = 12
     heavy_vehicle_min_confidence: float = 0.30
     heavy_vehicle_min_observations: int = 3
