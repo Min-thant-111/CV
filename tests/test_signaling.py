@@ -70,6 +70,25 @@ class TestSignalDecisionEngine(unittest.TestCase):
         self.assertEqual(decision.duration, 86)
         self.assertEqual(decision.density_level, "HIGH")
         self.assertIn("86s", decision.reason)
+        self.assertEqual(decision.base_duration, 70)
+        self.assertEqual(decision.vehicle_demand_duration, 8)
+        self.assertEqual(decision.per_path_queue_duration, 8)
+        self.assertEqual(decision.uncapped_duration, 86)
+
+    def test_capped_duration_exposes_readable_breakdown(self):
+        decision = self.engine.evaluate(
+            input_data="HIGH",
+            vehicle_count=94,
+            density_percentage=205.0,
+            road_path_count=5,
+        )
+
+        self.assertEqual(decision.duration, 180)
+        self.assertEqual(decision.base_duration, 70)
+        self.assertEqual(decision.vehicle_demand_duration, 94)
+        self.assertEqual(decision.per_path_queue_duration, 19)
+        self.assertEqual(decision.uncapped_duration, 183)
+        self.assertIn("capped from 183s", decision.reason)
 
     def test_evaluation_with_density_metrics_object(self):
         """Test evaluate() when passed a DensityMetrics object directly."""

@@ -41,7 +41,13 @@
   const lampGreen   = document.getElementById('lamp-green');
   const signalState = document.getElementById('signal-state');
   const signalDur   = document.getElementById('signal-duration');
-  const signalReason= document.getElementById('signal-reason');
+  const signalDensitySummary = document.getElementById('signal-density-summary');
+  const timingBreakdown = document.getElementById('timing-breakdown');
+  const timingBase = document.getElementById('timing-base');
+  const timingDemand = document.getElementById('timing-demand');
+  const timingPath = document.getElementById('timing-path');
+  const timingCap = document.getElementById('timing-cap');
+  const processingTime = document.getElementById('processing-time');
 
   // Density
   const gaugeArc      = document.getElementById('gauge-arc');
@@ -335,11 +341,37 @@
   function updateSignalPanel(data) {
     const sig    = (data.signal || 'RED').toUpperCase();
     const dur    = data.green_duration ?? '—';
-    const reason = data.reason || '';
 
     signalState.textContent  = sig;
     signalDur.textContent    = `${dur} seconds GREEN`;
-    signalReason.textContent = reason;
+    const level = String(data.density_level || 'low').toLowerCase();
+    const levelLabel = level.charAt(0).toUpperCase() + level.slice(1);
+    const vehicles = data.vehicle_count ?? 0;
+    const paths = data.road_path_count ?? 1;
+    signalDensitySummary.innerHTML =
+      `<strong class="level-${level}">${levelLabel} traffic density</strong>` +
+      `<span>${data.density_percentage ?? 0}%</span> with ` +
+      `<strong>${vehicles}</strong> vehicle${vehicles === 1 ? '' : 's'} across ` +
+      `<strong>${paths}</strong> road path${paths === 1 ? '' : 's'}.`;
+
+    const hasBreakdown = data.base_duration !== undefined;
+    timingBreakdown.classList.toggle('hidden', !hasBreakdown);
+    if (hasBreakdown) {
+      timingBase.textContent = `${data.base_duration}s`;
+      timingDemand.textContent = `+ ${data.vehicle_demand_duration}s`;
+      timingPath.textContent = `+ ${data.per_path_queue_duration}s`;
+    }
+    const wasCapped = data.uncapped_duration > data.green_duration;
+    timingCap.classList.toggle('hidden', !wasCapped);
+    if (wasCapped) {
+      timingCap.textContent =
+        `${data.uncapped_duration}s calculated · capped safely at ${data.green_duration}s`;
+    }
+    const isDone = data.type === 'done' && data.processing_seconds !== undefined;
+    processingTime.classList.toggle('hidden', !isDone);
+    if (isDone) {
+      processingTime.textContent = `Processed in ${formatDuration(data.processing_seconds)}`;
+    }
 
     // Colour
     const colours = { GREEN: '#22c55e', YELLOW: '#facc15', RED: '#f43f5e' };
@@ -518,7 +550,10 @@
     lampGreen.className  = 'tl-lamp tl-green';
     signalState.textContent  = '—';
     signalDur.textContent    = '— s';
-    signalReason.textContent = 'No signal yet.';
+    signalDensitySummary.textContent = 'No signal yet.';
+    timingBreakdown.classList.add('hidden');
+    timingCap.classList.add('hidden');
+    processingTime.classList.add('hidden');
     densityPct.textContent   = '0%';
     densityBadge.textContent = '—';
     densityBadge.className   = 'density-level-badge';

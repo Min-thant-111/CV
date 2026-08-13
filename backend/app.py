@@ -706,6 +706,10 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
                 "signal":             display_decision.signal,
                 "green_duration":     display_decision.duration,
                 "reason":             display_decision.reason,
+                "base_duration":      display_decision.base_duration,
+                "vehicle_demand_duration": display_decision.vehicle_demand_duration,
+                "per_path_queue_duration": display_decision.per_path_queue_duration,
+                "uncapped_duration":  display_decision.uncapped_duration,
                 "mqtt_published":     last_mqtt_ok,
                 "processing_fps":     round(processing_fps, 2),
                 "eta_seconds":        round(
@@ -735,6 +739,9 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
             **last_result,
             "type": "done",
             "message": "Analysis complete.",
+            "processing_seconds": round(
+                max(0.0, time.monotonic() - processing_started), 1
+            ),
             "source_url": job["source_url"],
             "output_url": output_url,
         }

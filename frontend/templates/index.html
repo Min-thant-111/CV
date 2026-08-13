@@ -114,7 +114,25 @@
           <div class="signal-info">
             <div class="signal-state-label" id="signal-state">—</div>
             <div class="signal-duration" id="signal-duration">— s</div>
-            <div class="signal-reason" id="signal-reason">No signal yet.</div>
+            <div class="signal-summary" id="signal-summary">
+              <div class="signal-density-summary" id="signal-density-summary">No signal yet.</div>
+              <div class="timing-breakdown hidden" id="timing-breakdown">
+                <div class="timing-item">
+                  <span class="timing-label">Base time</span>
+                  <strong id="timing-base">—</strong>
+                </div>
+                <div class="timing-item">
+                  <span class="timing-label">Vehicle demand</span>
+                  <strong id="timing-demand">—</strong>
+                </div>
+                <div class="timing-item">
+                  <span class="timing-label">Per-path queue</span>
+                  <strong id="timing-path">—</strong>
+                </div>
+              </div>
+              <div class="timing-cap hidden" id="timing-cap"></div>
+              <div class="processing-time hidden" id="processing-time"></div>
+            </div>
           </div>
         </div>
       </div>

@@ -378,10 +378,66 @@ body {
   margin: 6px 0 10px;
 }
 
-.signal-reason {
-  font-size: 0.78rem;
+.signal-summary { display: grid; gap: 10px; }
+
+.signal-density-summary {
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.signal-density-summary > span {
+  margin-left: 4px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.timing-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.timing-item {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.035);
+}
+
+.timing-label {
+  display: block;
+  margin-bottom: 4px;
   color: var(--text-muted);
-  line-height: 1.5;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.timing-item strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+}
+
+.timing-cap {
+  color: var(--accent-orange);
+  font-size: 0.72rem;
+}
+
+.processing-time {
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 99px;
+  border: 1px solid rgba(34,197,94,0.25);
+  background: rgba(34,197,94,0.08);
+  color: var(--accent-green);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 600px) {
+  .timing-breakdown { grid-template-columns: 1fr; }
 }
 
 /* ── Density Gauge ──────────────────────────────────────────────── */

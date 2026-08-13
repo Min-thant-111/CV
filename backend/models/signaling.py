@@ -17,6 +17,10 @@ class SignalDecision:
     vehicle_count: int
     reason: str
     road_path_count: int = 1
+    base_duration: int = 0
+    vehicle_demand_duration: int = 0
+    per_path_queue_duration: int = 0
+    uncapped_duration: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert decision to dictionary representation."""
@@ -28,4 +32,8 @@ class SignalDecision:
             "vehicle_count": self.vehicle_count,
             "road_path_count": self.road_path_count,
             "reason": self.reason,
+            "base_duration": self.base_duration,
+            "vehicle_demand_duration": self.vehicle_demand_duration,
+            "per_path_queue_duration": self.per_path_queue_duration,
+            "uncapped_duration": self.uncapped_duration,
         }

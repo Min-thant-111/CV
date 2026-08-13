@@ -84,18 +84,23 @@ class RuleBasedSignalStrategy(BaseSignalStrategy):
             (vehicle_count / road_path_count)
             * config.seconds_per_vehicle_per_path
         )
-        duration = base_duration + count_adjustment + per_path_adjustment
+        uncapped_duration = base_duration + count_adjustment + per_path_adjustment
+        duration = uncapped_duration
 
         # Enforce configurable minimum and maximum safety bounds
         duration = max(
             config.min_green_duration, min(config.max_green_duration, duration)
+        )
+        cap_note = (
+            f" (capped from {uncapped_duration}s)"
+            if duration != uncapped_duration else ""
         )
         reason = (
             f"{level_upper.title()} traffic density ({density_percentage:.1f}%) with "
             f"{vehicle_count} vehicles across {road_path_count} road "
             f"{'path' if road_path_count == 1 else 'paths'}. "
             f"GREEN time: {base_duration}s base + {count_adjustment}s vehicle demand "
-            f"+ {per_path_adjustment}s per-path queue = {duration}s."
+            f"+ {per_path_adjustment}s per-path queue = {duration}s{cap_note}."
         )
 
         return SignalDecision(
@@ -106,6 +111,10 @@ class RuleBasedSignalStrategy(BaseSignalStrategy):
             vehicle_count=vehicle_count,
             reason=reason,
             road_path_count=road_path_count,
+            base_duration=base_duration,
+            vehicle_demand_duration=count_adjustment,
+            per_path_queue_duration=per_path_adjustment,
+            uncapped_duration=uncapped_duration,
         )
 
 
