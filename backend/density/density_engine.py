@@ -36,8 +36,9 @@ class DensityConfig:
         default_factory=lambda: dict(DEFAULT_VEHICLE_WEIGHTS)
     )
     max_road_capacity_units: float = 10.0  # PCU capacity per road path
-    low_threshold_pct: float = 35.0        # < 35% is LOW density
-    high_threshold_pct: float = 70.0       # >= 70% is HIGH density (35%-70% is MEDIUM)
+    low_threshold_pct: float = 45.0        # <= 45% is LOW density
+    high_threshold_pct: float = 70.0       # >= 70% is HIGH density (>45%-<70% is MEDIUM)
+    five_path_low_vehicle_limit: int = 22  # Count guardrail for wide five-path roads
     roi_polygon: Optional[List[Tuple[float, float]]] = None  # Polygon coordinates for ROI filtering
     road_path_count: int = 1               # Parallel paths/ways visible in the road
 
@@ -137,7 +138,11 @@ class DensityEngine:
         density_pct = round(density_pct, 2)
 
         # 4. Classify density level (LOW, MEDIUM, HIGH)
-        if density_pct < self.config.low_threshold_pct:
+        five_path_count_is_low = (
+            road_path_count >= 5
+            and total_count <= max(0, int(self.config.five_path_low_vehicle_limit))
+        )
+        if density_pct <= self.config.low_threshold_pct or five_path_count_is_low:
             density_level = "LOW"
         elif density_pct < self.config.high_threshold_pct:
             density_level = "MEDIUM"

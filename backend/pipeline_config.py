@@ -15,7 +15,7 @@ class PipelineConfig:
 
     # ── Video ──────────────────────────────────────────────
     video_path: str = ""
-    frame_skip: int = 1              # Process at 5 FPS for typical 10 FPS CCTV
+    frame_skip: int = 2              # Analyze every third frame for faster edge inference
     target_width: Optional[int] = None
     target_height: Optional[int] = None
 
@@ -27,8 +27,8 @@ class PipelineConfig:
     high_recall_tiling: bool = True
     tile_inference_size: int = 640
     tile_confidence_threshold: float = 0.18
-    tile_grid_size: int = 3
-    tile_interval_frames: int = 5
+    tile_grid_size: int = 2
+    tile_interval_frames: int = 15
     far_field_recall: bool = True
     far_field_inference_size: int = 1280
     far_field_confidence_threshold: float = 0.05

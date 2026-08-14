@@ -195,6 +195,14 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/favicon.ico")
+def favicon():
+    """Serve the dashboard icon at the conventional browser favicon path."""
+    return send_from_directory(
+        str(STATIC_DIR), "favicon.svg", mimetype="image/svg+xml"
+    )
+
+
 @app.route("/api/videos")
 def list_videos():
     """List uploaded source videos and generated/evaluation videos."""
@@ -425,7 +433,7 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
         push({"type": "status", "message": "Loading video metadata...", "step": "loading"})
 
         # ── Video metadata ──────────────────────────────────────────
-        frame_skip = max(0, int(os.getenv("FRAME_SKIP", "1")))
+        frame_skip = max(0, int(os.getenv("FRAME_SKIP", "2")))
         processor = VideoProcessor(video_path=video_path, frame_skip=frame_skip)
         meta = processor.metadata
         push({"type": "status", "message": "Detecting road paths from video...", "step": "road_paths"})
@@ -494,8 +502,8 @@ def _run_pipeline(job_id: str, video_path: str) -> None:
             in {"1", "true", "yes", "on"},
             tile_inference_size=int(os.getenv("TILE_IMGSZ", "640")),
             tile_confidence_threshold=float(os.getenv("TILE_CONFIDENCE", "0.18")),
-            tile_grid_size=int(os.getenv("TILE_GRID", "3")),
-            tile_interval_frames=int(os.getenv("TILE_INTERVAL", "5")),
+            tile_grid_size=int(os.getenv("TILE_GRID", "2")),
+            tile_interval_frames=int(os.getenv("TILE_INTERVAL", "15")),
             far_field_recall=os.getenv("FAR_FIELD_RECALL", "true").lower()
             in {"1", "true", "yes", "on"},
             far_field_inference_size=int(os.getenv("FAR_FIELD_IMGSZ", "1280")),

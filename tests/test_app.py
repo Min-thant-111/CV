@@ -62,6 +62,14 @@ class TestFlaskRoutes(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b"Edge-CV", resp.data)
 
+    def test_favicon_returns_svg(self):
+        """Browsers requesting the conventional favicon path must not get a 404."""
+        resp = self.client.get("/favicon.ico")
+        self.addCleanup(resp.close)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.mimetype, "image/svg+xml")
+        self.assertIn(b"<svg", resp.data)
+
     # ── POST /api/upload ───────────────────────────────────────────────
 
     def test_upload_no_file_field_returns_400(self):

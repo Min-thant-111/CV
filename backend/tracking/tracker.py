@@ -97,6 +97,7 @@ class VehicleTracker:
         )
         self._next_supplemental_id = 1_000_000
         self._previous_supplemental: Dict[int, TrackedObject] = {}
+        self._last_supplemental_scan_frame: Optional[int] = None
         self._recent_tracks: Dict[int, Tuple[TrackedObject, int]] = {}
         self._class_history: Dict[int, Deque[Tuple[int, float]]] = {}
         self._resolved_classes: Dict[int, int] = {}
@@ -675,13 +676,15 @@ class VehicleTracker:
         observed_ids = {item.track_id for item in tracks}
         if self.high_recall:
             should_scan_tiles = (
-                not self._previous_supplemental
-                or frame_index % self.tile_interval_frames == 0
+                self._last_supplemental_scan_frame is None
+                or frame_index - self._last_supplemental_scan_frame
+                >= self.tile_interval_frames
             )
             if should_scan_tiles:
                 candidates = self._tile_candidates(frame)
                 if self.far_field_recall:
                     candidates.extend(self._far_field_candidates(frame))
+                self._last_supplemental_scan_frame = frame_index
                 tracks = self._merge_supplemental(
                     tracks, candidates
                 )

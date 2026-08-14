@@ -179,6 +179,10 @@ Key `.env` variables:
 |----------|---------|-------------|
 | `YOLO_MODEL_PATH` | `yolov8s.pt` | Path to YOLO weights (`yolov8n.pt` is faster but less accurate) |
 | `CONFIDENCE_THRESHOLD` | `0.35` | Detection confidence threshold |
+| `FRAME_SKIP` | `2` | Analyze every third source frame (`0` analyzes every frame) |
+| `TILE_GRID` | `2` | Supplemental high-recall grid size (2x2) |
+| `TILE_INTERVAL` | `15` | Source frames between supplemental scans |
+| `DENSITY_LOW_PCT` | `45` | Inclusive upper boundary for LOW density |
 | `MQTT_BROKER_HOST` | `localhost` | MQTT broker address |
 | `MQTT_BROKER_PORT` | `1883` | MQTT broker port |
 | `MQTT_TOPIC_SIGNAL` | `traffic/intersection1/signal` | Publish topic |
@@ -240,9 +244,13 @@ The signal engine implements the **Strategy Pattern** and defaults to a rule-bas
 
 | Density Level | PCU Threshold | Base GREEN |
 |---------------|--------------|------------|
-| LOW | < 35% occupancy | 30 seconds |
-| MEDIUM | 35% – 70% | 50 seconds |
+| LOW | <= 45% occupancy | 30 seconds |
+| MEDIUM | > 45% and < 70% occupancy | 50 seconds |
 | HIGH | ≥ 70% occupancy | 70 seconds |
+
+For a detected five-path road, a count guardrail keeps up to 22 visible
+vehicles in LOW even when bus/truck PCU weighting pushes the raw percentage
+above 45%. At 23 vehicles, the normal PCU thresholds apply.
 
 The final green time is adaptive rather than fixed:
 

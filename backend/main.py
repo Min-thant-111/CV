@@ -61,7 +61,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--frame-skip",
         type=int,
-        default=2,
+        default=int(os.getenv("FRAME_SKIP", "2")),
         help="Skip N frames between processing steps.",
     )
     parser.add_argument(
@@ -119,7 +119,7 @@ def main() -> None:
         log_interval_frames=args.publish_interval,
         mqtt_enabled=not args.no_mqtt,
         density=DensityConfig(
-            low_threshold_pct=float(os.getenv("DENSITY_LOW_PCT", "35.0")),
+            low_threshold_pct=float(os.getenv("DENSITY_LOW_PCT", "45.0")),
             high_threshold_pct=float(os.getenv("DENSITY_HIGH_PCT", "70.0")),
         ),
         signal=SignalConfig(

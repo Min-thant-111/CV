@@ -178,6 +178,30 @@ class TestVehicleTracker(unittest.TestCase):
         self.assertEqual(mock_model.predict.call_count, 2)
 
     @patch("ultralytics.YOLO")
+    def test_empty_high_recall_scan_waits_for_interval(self, mock_yolo_cls):
+        """An empty supplemental scan must not be repeated on every frame."""
+        mock_model = MagicMock()
+        mock_yolo_cls.return_value = mock_model
+        mock_model.track.return_value = [MagicMock(boxes=[])]
+        mock_model.predict.return_value = [MagicMock(boxes=[]) for _ in range(4)]
+
+        detector = YOLODetector(model_path="yolov8n.pt")
+        tracker = VehicleTracker(
+            detector=detector,
+            high_recall=True,
+            tile_interval_frames=5,
+        )
+        frame = np.zeros((100, 100, 3), dtype=np.uint8)
+
+        tracker.track_frame(frame, frame_index=0)
+        tracker.track_frame(frame, frame_index=1)
+        tracker.track_frame(frame, frame_index=4)
+        self.assertEqual(mock_model.predict.call_count, 1)
+
+        tracker.track_frame(frame, frame_index=5)
+        self.assertEqual(mock_model.predict.call_count, 2)
+
+    @patch("ultralytics.YOLO")
     def test_truck_requires_three_consistent_observations(self, mock_yolo_cls):
         mock_model = MagicMock()
         mock_yolo_cls.return_value = mock_model

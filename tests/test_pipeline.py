@@ -122,7 +122,7 @@ class TestTrafficPipelineIntegration(unittest.TestCase):
         mock_model = MagicMock()
         mock_yolo_cls.return_value = mock_model
 
-        # Mock 4 cars — MEDIUM/HIGH density (4.0 PCU / 10.0 cap = 40% → MEDIUM)
+        # Mock 4 cars: 4.0 PCU / 10.0 capacity = 40%, the upper LOW boundary.
         def mock_track(*args, **kwargs):
             boxes = []
             for i in range(4):
@@ -173,15 +173,15 @@ class TestTrafficPipelineIntegration(unittest.TestCase):
         self.assertEqual(density_low.density_level, "LOW")
         self.assertEqual(decision_low.duration, 32)
 
-        # ── MEDIUM: 4 cars = 4.0 PCU → 40% → MEDIUM → 50s ───────────
+        # ── MEDIUM: 5 cars = 5.0 PCU → 50% → MEDIUM → 50s ───────────
         medium_tracks = FrameTracks(
             frame_index=1, timestamp=0.033,
-            tracks=[TrackedObject(i, 2, "car", 0.9, (i*10, i*10, i*10+50, i*10+50)) for i in range(4)]
+            tracks=[TrackedObject(i, 2, "car", 0.9, (i*10, i*10, i*10+50, i*10+50)) for i in range(5)]
         )
         density_med = pipeline._density_engine.compute_density(medium_tracks)
         decision_med = pipeline._signal_engine.evaluate(density_med)
         self.assertEqual(density_med.density_level, "MEDIUM")
-        self.assertEqual(decision_med.duration, 58)
+        self.assertEqual(decision_med.duration, 60)
 
         # ── HIGH: 4 cars + 2 buses = 9.0 PCU → 90% → HIGH → 70s ─────
         high_tracks = FrameTracks(

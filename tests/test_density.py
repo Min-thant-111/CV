@@ -169,6 +169,35 @@ class TestDensityEngine(unittest.TestCase):
         self.assertEqual(three_paths.road_path_count, 3)
         self.assertEqual(three_paths.capacity_units, 30.0)
 
+    def test_twenty_two_cars_across_five_paths_is_low_density(self):
+        """Twenty-two cars across five paths remain within the LOW boundary."""
+        engine = DensityEngine(DensityConfig(road_path_count=5))
+
+        result = engine.compute_density_from_counts({"car": 22})
+
+        self.assertEqual(result.capacity_units, 50.0)
+        self.assertEqual(result.density_percentage, 44.0)
+        self.assertEqual(result.density_level, "LOW")
+
+    def test_twenty_two_mixed_vehicles_across_five_paths_is_low_density(self):
+        """The five-path count rule applies even when heavy vehicles raise PCU."""
+        engine = DensityEngine(DensityConfig(road_path_count=5))
+
+        result = engine.compute_density_from_counts({"car": 18, "bus": 2, "truck": 2})
+
+        self.assertEqual(result.total_vehicle_count, 22)
+        self.assertEqual(result.density_percentage, 58.0)
+        self.assertEqual(result.density_level, "LOW")
+
+    def test_twenty_three_cars_across_five_paths_is_medium_density(self):
+        """Demand above the 45% boundary moves into MEDIUM traffic."""
+        engine = DensityEngine(DensityConfig(road_path_count=5))
+
+        result = engine.compute_density_from_counts({"car": 23})
+
+        self.assertEqual(result.density_percentage, 46.0)
+        self.assertEqual(result.density_level, "MEDIUM")
+
     def test_roi_polygon_filtering(self):
         """Test that objects outside the ROI polygon are ignored."""
         # ROI polygon: square from (0,0) to (100,100)
